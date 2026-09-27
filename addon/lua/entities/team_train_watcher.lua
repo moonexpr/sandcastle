@@ -219,7 +219,7 @@ function ENT:Think()
 	local owners = {}
 	for _, c in ipairs(self.checkpoints) do
 		local cp = TF2.FindByName(c.cp)
-		owners[#owners + 1] = IsValid(cp) and cp:GetCapTeam() or 0
+		owners[#owners + 1] = IsValid(cp) and TF2.CapTeam(cp) or 0
 	end
 	SetGlobal2String("tf2.cart.owners", table.concat(owners, ","))
 	return true

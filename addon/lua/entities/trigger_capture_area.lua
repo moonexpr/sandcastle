@@ -53,7 +53,7 @@ function ENT:Survey()
 		if counts[team] then counts[team] = counts[team] + 1 end
 	end
 	local point = self:Point()
-	local owner = IsValid(point) and point:GetCapTeam() or TF2.TEAM_UNASSIGNED
+	local owner = IsValid(point) and TF2.CapTeam(point) or TF2.TEAM_UNASSIGNED
 	local capping = TF2.TEAM_UNASSIGNED
 	for team = TF2.TEAM_RED, TF2.TEAM_BLUE do
 		if self.canCap[team] and team ~= owner and counts[team] >= self.numCap[team] then
@@ -111,13 +111,13 @@ function ENT:CaptureCurrentPoint(activator)
 	local team = self.cappingTeam
 	if team == TF2.TEAM_UNASSIGNED then
 		for t = TF2.TEAM_BLUE, TF2.TEAM_RED, -1 do
-			if self.canCap[t] and point:GetCapTeam() ~= t then team = t break end
+			if self.canCap[t] and TF2.CapTeam(point) ~= t then team = t break end
 		end
 	end
 	if team == TF2.TEAM_UNASSIGNED then return end
 	self:TriggerOutput("OnEndCap", self)
 	self:TriggerOutput(team == TF2.TEAM_RED and "OnCapTeam1" or "OnCapTeam2", self)
-	point:SetOwnerTeam(team, activator)
+	TF2.SetPointOwner(point, team, activator)
 end
 
 local INPUTS = {

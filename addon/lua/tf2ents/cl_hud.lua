@@ -4,6 +4,10 @@ surface.CreateFont("TF2Ents.Timer", { font = "Roboto", size = 34, weight = 800 }
 surface.CreateFont("TF2Ents.Label", { font = "Roboto", size = 18, weight = 700 })
 surface.CreateFont("TF2Ents.Announce", { font = "Roboto", size = 42, weight = 900 })
 
+-- The top-centre of the screen can sit under a display notch (MacBook), so
+-- the timer is pushed down by a fraction of the screen height.
+local timer_y = CreateClientConVar("tf2_hud_timer_y", "0.08", true, false, "Timer box top, as a fraction of screen height (clears display notches).")
+
 local announcement
 
 net.Receive("tf2.announce", function()
@@ -19,8 +23,9 @@ local function Clock(seconds)
 	return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
 end
 
-local function DrawTimer(w)
+local function DrawTimer(w, h)
 	if not GetGlobal2Bool("tf2.timer.show", false) then return end
+	local top = math.floor(h * timer_y:GetFloat())
 	local left
 	if GetGlobal2Bool("tf2.timer.paused", true) then
 		left = GetGlobal2Float("tf2.timer.left", 0)
@@ -35,10 +40,10 @@ local function DrawTimer(w)
 	elseif GetGlobal2Bool("tf2.overtime", false) then
 		label = "OVERTIME"
 	end
-	draw.RoundedBox(6, w / 2 - 70, 12, 140, label and 64 or 46, Color(0, 0, 0, 170))
-	draw.SimpleText(Clock(left), "TF2Ents.Timer", w / 2, 16, color_white, TEXT_ALIGN_CENTER)
+	draw.RoundedBox(6, w / 2 - 70, top, 140, label and 64 or 46, Color(0, 0, 0, 170))
+	draw.SimpleText(Clock(left), "TF2Ents.Timer", w / 2, top + 4, color_white, TEXT_ALIGN_CENTER)
 	if label then
-		draw.SimpleText(label, "TF2Ents.Label", w / 2, 52, Color(255, 210, 90), TEXT_ALIGN_CENTER)
+		draw.SimpleText(label, "TF2Ents.Label", w / 2, top + 40, Color(255, 210, 90), TEXT_ALIGN_CENTER)
 	end
 end
 
@@ -98,7 +103,7 @@ end
 hook.Add("HUDPaint", "tf2.hud", function()
 	if not TF2.Active() then return end
 	local w, h = ScrW(), ScrH()
-	DrawTimer(w)
+	DrawTimer(w, h)
 	DrawCart(w, h)
 	DrawAnnouncement(w, h)
 	DrawRespawn(w, h)

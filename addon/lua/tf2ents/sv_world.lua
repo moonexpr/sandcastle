@@ -10,25 +10,69 @@ TF2.KV = TF2.KV or setmetatable({}, { __mode = "k" })
 local RECORDED = {
 	path_track = true,
 	info_player_teamspawn = true,
+	team_control_point = true,
 }
 
+-- Outputs are kept in map order in kv.outputs, since an output key may repeat.
 hook.Add("EntityKeyValue", "tf2.record", function(ent, key, value)
 	if not RECORDED[ent:GetClass()] then return end
 	local kv = TF2.KV[ent]
 	if not kv then
-		kv = {}
+		kv = { outputs = {} }
 		TF2.KV[ent] = kv
 	end
-	kv[string.lower(key)] = value
+	if string.sub(key, 1, 2) == "On" then
+		kv.outputs[#kv.outputs + 1] = TF2.ParseOutput(key, value)
+	else
+		kv[string.lower(key)] = value
+	end
 end)
 
 function TF2.KeyValues(ent)
-	return TF2.KV[ent] or {}
+	return TF2.KV[ent] or { outputs = {} }
 end
 
 function TF2.FindByName(name)
 	if not name or name == "" then return NULL end
 	return ents.FindByName(name)[1] or NULL
+end
+
+-- An output connection as Hammer writes it: target,input,param,delay,times
+-- (newer compilers separate the fields with ESC instead of commas).
+function TF2.ParseOutput(name, value)
+	local sep = string.find(value, "\27", 1, true) and "\27" or ","
+	local f = string.Explode(sep, value)
+	return {
+		name = name,
+		target = f[1] or "",
+		input = f[2] or "",
+		param = f[3] or "",
+		delay = tonumber(f[4]) or 0,
+		times = tonumber(f[5]) or -1,
+		fired = 0,
+	}
+end
+
+local function OutputTargets(o, caller, activator)
+	local t = string.lower(o.target)
+	if t == "!self" or t == "!caller" then return { caller } end
+	if t == "!activator" then return { activator } end
+	if t == "!player" then return { player.GetAll()[1] } end
+	return ents.FindByName(o.target)
+end
+
+-- Fire the named output of an engine entity whose outputs we recorded.
+function TF2.FireOutput(caller, name, activator)
+	for _, o in ipairs(TF2.KeyValues(caller).outputs) do
+		if o.name == name and (o.times < 0 or o.fired < o.times) then
+			o.fired = o.fired + 1
+			for _, target in ipairs(OutputTargets(o, caller, activator)) do
+				if IsValid(target) then
+					target:Fire(o.input, o.param, o.delay, activator, caller)
+				end
+			end
+		end
+	end
 end
 
 function TF2.Announce(text, team)
@@ -162,11 +206,14 @@ hook.Add("PlayerSelectSpawn", "tf2.teamspawn", function(ply)
 end)
 
 -- Until there is a team picker, anyone without a TF2 team joins BLU so they
--- can push the cart.
+-- can push the cart. Other addons set teams in their own spawn hooks (one puts
+-- players on a "Runner" team), so this runs a tick later, after them.
 local function AssignDefaultTeam(ply)
-	if TF2.Active() and TF2.TeamOf(ply) == TF2.TEAM_UNASSIGNED then
-		ply:SetTeam(TF2.TEAM_BLUE)
-	end
+	timer.Simple(0, function()
+		if IsValid(ply) and TF2.Active() and TF2.TeamOf(ply) == TF2.TEAM_UNASSIGNED then
+			ply:SetTeam(TF2.TEAM_BLUE)
+		end
+	end)
 end
 hook.Add("PlayerInitialSpawn", "tf2.defaultteam", AssignDefaultTeam)
 hook.Add("PlayerSpawn", "tf2.defaultteam", AssignDefaultTeam)

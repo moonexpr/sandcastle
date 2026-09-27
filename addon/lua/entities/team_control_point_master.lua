@@ -42,10 +42,10 @@ function ENT:CheckWinConditions()
 	if not self.enabled then return end
 	local points, restrictTeam = self:PointsInPlay()
 	if #points == 0 then return end
-	local owner = points[1]:GetCapTeam()
+	local owner = TF2.CapTeam(points[1])
 	if owner == TF2.TEAM_UNASSIGNED or owner == restrictTeam then return end
 	for _, point in ipairs(points) do
-		if point:GetCapTeam() ~= owner then return end
+		if TF2.CapTeam(point) ~= owner then return end
 	end
 	self:Win(owner)
 end
