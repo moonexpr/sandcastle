@@ -1,6 +1,5 @@
 include("shared.lua")
-include("tf2/cl_hud.lua")
-include("tf2/cl_announcer.lua")
+for _, f in ipairs(GM:TF2Modules("cl_")) do include("tf2/" .. f) end
 
 -- Tell the server this client has loaded, so the first round's pre-round
 -- freeze is not spent on the loading screen.
@@ -12,7 +11,10 @@ end
 
 function GM:HUDPaint()
 	self.BaseClass.HUDPaint(self)
-	if TF2.Active() then TF2.DrawHUD() end
+	if not TF2.Active() then return end
+	TF2.DrawHUD()
+	-- Modules draw their own HUD elements here.
+	hook.Run("SandcastleHUDPaint", ScrW(), ScrH())
 end
 
 function GM:Think()

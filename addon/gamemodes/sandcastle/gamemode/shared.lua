@@ -8,8 +8,19 @@ GM.Website = ""
 
 DeriveGamemode("sandbox")
 
+-- Modules in gamemode/tf2/ load by prefix: sh_ on both realms, sv_ on the
+-- server, cl_ on clients. sh_core defines the TF2 table and loads first;
+-- the rest load in name order.
+function GM:TF2Modules(prefix)
+	local files = file.Find(self.FolderName .. "/gamemode/tf2/" .. prefix .. "*.lua", "LUA")
+	table.sort(files)
+	return files
+end
+
 include("tf2/sh_core.lua")
-include("tf2/sh_soundscripts.lua")
+for _, f in ipairs(GM:TF2Modules("sh_")) do
+	if f ~= "sh_core.lua" then include("tf2/" .. f) end
+end
 
 -- TF2's team numbers; GMod reserves only 0, 1001 and 1002.
 function GM:CreateTeams()
@@ -18,7 +29,7 @@ function GM:CreateTeams()
 	team.SetUp(TF2.TEAM_BLUE, "BLU", TF2.TeamColor[TF2.TEAM_BLUE], false)
 end
 
+-- Neither Sandbox nor base defines StartCommand, so there is nothing to defer to.
 function GM:StartCommand(ply, cmd)
-	self.BaseClass.StartCommand(self, ply, cmd)
 	if TF2.Active() then TF2.RestrictCommand(ply, cmd) end
 end

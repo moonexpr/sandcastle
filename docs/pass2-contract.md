@@ -1,0 +1,105 @@
+# Sandcastle pass 2: working contract
+
+Sandcastle is a Garry's Mod gamemode: Sandbox, plus working TF2 gameplay
+entities, so TF2 maps (pl_, plr_) play their rounds. Pass 1 made one pl round
+work on pl_badwater. Pass 2 brings the entities to roughly 75% of TF2's
+behaviour, adds a team switcher, and adds payload race (plr_). Three agents
+work in parallel, each in its own git worktree and branch; the integrator
+(the parent session) merges and tests in game.
+
+## Layout
+
+```
+addon/gamemodes/sandcastle/
+  sandcastle.txt                 gamemode manifest (base: sandbox)
+  gamemode/shared.lua            GM, DeriveGamemode("sandbox"), module loader, CreateTeams, StartCommand
+  gamemode/init.lua              server GM overrides (spawn, death, team default)
+  gamemode/cl_init.lua           client GM overrides (HUDPaint -> hook "SandcastleHUDPaint")
+  gamemode/tf2/sh_*.lua          loaded on both realms (sh_core first, then name order)
+  gamemode/tf2/sv_*.lua          loaded on the server, name order
+  gamemode/tf2/cl_*.lua          loaded on clients, name order
+  gamemode/tf2/lib_*.lua         pure logic, no GMod globals, returns a table; NOT auto-loaded:
+                                 the module that uses it includes it (and AddCSLuaFile's it if clients need it)
+  entities/entities/<class>.lua  one file per TF2 entity class
+tests/harness.lua, tests/*_test.lua   LuaJIT tests for lib_*.lua (.devtools/bin/run_lua_tests.sh)
+```
+
+New modules need no wiring: drop a correctly prefixed file into gamemode/tf2/.
+
+## What the game gives you (facts established in pass 1)
+
+- Lua entities: `point` and `brush` types are server-only; `anim` networks and draws;
+  `filter` plugs into engine triggers via `ENT:PassesFilter(trigger, ent)`.
+- GMod's engine already owns `team_control_point`, `info_player_teamspawn`,
+  `path_track`, `func_tracktrain`: a Lua class of the same name never spawns. Their
+  keyvalues are recorded by the EntityKeyValue hook in sv_world.lua (`TF2.KeyValues(ent)`,
+  outputs as an ordered list in `.outputs`), inputs are intercepted with the `AcceptInput`
+  hook, outputs fired with `TF2.FireOutput(ent, name, activator)`.
+- `team_control_point` state lives in sv_controlpoint.lua (owner, lock, model).
+- `func_tracktrain` accepts `SetSpeedDirAccel` and `SetSpeedForwardModifier`; its
+  `m_flSpeed` is readable with `GetInternalVariable`. path_track `OnPass` can be
+  subscribed to with `AddOutput`.
+- A brush entity's `OBBMins/OBBMaxs` after `SetModel("*N")` are brush-space; test
+  containment with `ent:WorldToLocal(pos)` (works when parented to the moving cart).
+- TF2's soundscripts are loaded (sh_soundscripts.lua), so `ply:EmitSound("Announcer.X")`,
+  `TF2.BroadcastSound(team, "Game.X")` and engine entities' named sounds all resolve.
+- Team numbers are TF2's: 0 unassigned, 1 spectator, 2 RED, 3 BLU. `TF2.TeamOf(ply)`
+  returns 2/3 or 0 for anything else (other addons use other teams, e.g. 21 "Runner").
+- Neither Sandbox nor base defines `GM:StartCommand` or server `GM:PostPlayerDeath`;
+  do not call BaseClass for those.
+
+## Ownership (edit only your files; request changes to others in your report)
+
+| Agent | Owns |
+|---|---|
+| **A payload** | entities: team_train_watcher, trigger_capture_area, mapobj_cart_dispenser, dispenser_touch_trigger, NEW tf_logic_multiple_escort; modules: cl_hud.lua, NEW sv_payload*/cl_payload*/lib_payload* |
+| **B rounds** | entities: tf_gamerules, team_round_timer, team_control_point_master, team_control_point_round, game_round_win, NEW game_forcerespawn, NEW tf_logic_holiday; modules: sv_controlpoint.lua, cl_announcer.lua, NEW sv_rounds*/cl_rounds*/lib_rounds* |
+| **C players** | entities: func_regenerate, func_respawnroom, func_respawnroomvisualizer, func_nobuild, tf2_brush_volume, tf2_pickup_base, item_*, filter_activator_tfteam, info_observer_point, NEW misc (trigger_stun, trigger_add/remove_tf_player_condition, trigger_catapult if GMod lacks it, func_nogrenades, bot_hint_*/func_nav_*/func_tfbot_hint no-ops, entity_spawn_point/manager, tf_ammo_pack); modules: sv_world.lua, sh_core.lua, gamemode/init.lua, NEW sv_teams*/cl_teams*/lib_teams* |
+| integrator | gamemode/shared.lua, gamemode/cl_init.lua, sh_soundscripts.lua, docs/, .devtools/ |
+
+## Interfaces
+
+Existing, keep signatures stable:
+
+- `TF2.TeamOf(ent)`, `TF2.EnemyOf(team)`, `TF2.Active()`, `TF2.State()`, `TF2.STATE.*`, `TF2.TeamName`, `TF2.TeamColor`
+- `TF2.Rules` (the tf_gamerules entity): `:StateGet()`, `:InSetup()`, `:PointsMayBeCaptured()`,
+  `:SetWinningTeam(team, reason, forceMapReset, switchTeams)`, `:OnPlayerDeath(ply)`
+- `TF2.CapTeam(point)`, `TF2.SetPointOwner(point, team, activator)`, `TF2.PointLocked(point)`, `TF2.PointIndex(point)`, `TF2.ApplyPointModel(point)`
+- `TF2.KeyValues(ent)`, `TF2.FireOutput(ent, name, activator)`, `TF2.ParseOutput(name, value)`, `TF2.FindByName(name)`
+- `TF2.PlayersInside(ent)`, `TF2.IsAliveInGame(ply)`, `TF2.HealFraction(ply, f)`, `TF2.GiveAmmoFraction(ply, f)`
+- `TF2.SpawnPoints(team)`, `TF2.PickSpawn(team)`, `TF2.Announce(text, team)`, `TF2.BroadcastSound(team, name)` (team 0 = everyone)
+- hooks: `TF2RoundActive()`, `TF2RoundWin(winner)`, `TF2PointCaptured(point, team)`, client `SandcastleHUDPaint(w, h)`
+
+New, each provided by its owner exactly as named (others may call them):
+
+- **B** `TF2.TeamCanCapPoint(point, team) -> bool`: not locked, team does not own it, previous points owned, point belongs to the current round (if rounds are in use). A's capture areas call it.
+- **B** `TF2.CurrentRound() -> team_control_point_round entity or NULL`; hook `TF2MiniRoundStart(round)` after a mini-round begins (after its spawn changes apply).
+- **B** `TF2.SwitchTeams()`: swap every RED/BLU player (used by switch_teams on win). Implement via `TF2.SetPlayerTeam`.
+- **B** hook `TF2Overtime(active)` when the timer enters/leaves overtime.
+- **C** `TF2.SetPlayerTeam(ply, team)`: the one way to change a player's TF2 team (TF2 semantics: a live player switching teams dies and respawns with the waves; spectator).
+- **C** `TF2.RoundSpawnFilter` is not an API; C decides spawn selection per round from `TF2.CurrentRound()`.
+- **A** each watcher entity: `:TimerMayExpire()`, `:IsWatching(train)`, `:SetNumTrainCappers(num, area)` (existing).
+
+## Networked keys (Global2 vars)
+
+- B owns and may add, not rename: `tf2.active`, `tf2.state`, `tf2.setup`, `tf2.winner`, `tf2.preroundEnd`, `tf2.overtime`, `tf2.timer.{show,paused,left,end,setup,autocountdown,serial}`.
+- A owns `tf2.cart.*` and may reshape it for several carts (A also owns cl_hud.lua, which reads it and the timer keys).
+- Anything else: prefix with your area (`tf2.round.*` B, `tf2.team.*` C).
+
+## Conventions
+
+- Behaviour comes from TF2's code: source-sdk-2013 at `~/Repositories/source-sdk-2013/src/game/` (server/, shared/, shared/tf/, server/tf/, client/tf/). Cite the C++ function a behaviour comes from in a short comment where the reason is not obvious. Keyvalues, inputs and outputs of every entity are in TF2's FGD: `$TF2/bin/tf.fgd` (also queryable via the tf2vscript MCP tool `entity_io`), where `$TF2="$HOME/Library/Application Support/CrossOver/Bottles/Team Fortress 2/drive_c/Steam/steamapps/common/Team Fortress 2"`.
+- Map data: `.devtools/bin/bsp_entities.py $TF2/tf/maps/<map>.bsp [--json | --class C | --io]` dumps any map's entities; use it to see how real maps use an entity before implementing it.
+- TF2's own convar names and defaults (from the SDK) for TF2 settings; `castle_*` for Sandcastle-only settings.
+- Code style (from the operator's rules): pure logic goes in `lib_*.lua` with a LuaJIT test written first and seen failing; no defensive fallbacks for states the code rules out; small functions with one job; comments only for constraints the code cannot show. Match the existing files: tabs, `local` helpers, INPUTS tables keyed by lowercased input name, `ENT:KeyValue` storing `On*` via `StoreOutput`.
+- Every Lua file must pass `luajit -b <file> /dev/null`; `.devtools/bin/run_lua_tests.sh` must pass.
+- Do not use the live game (`.devtools/bin/gmod_lua.py`) and do not launch or close Garry's Mod or Steam: the integrator tests in game after merging.
+- Commit in small units on your branch: `git -c gpg.program=gpg-loopback commit -m "..."`. Never add Co-Authored-By or any Claude attribution. Do not push. Messages explain what and why.
+
+## Census: TF2-only entity classes in the 49 installed pl_/plr_ maps
+
+17 classes are in every map (all implemented in pass 1). Then: game_round_win 41,
+item_healthkit_full 38, team_control_point_round 36, game_forcerespawn 21,
+tf_logic_holiday 13, entity_spawn_point/manager 12, tf_logic_multiple_escort 9 (every plr_),
+tf_spell_pickup 8, tf_zombie_spawner 8, trigger_add_tf_player_condition 8, trigger_stun 7,
+bot_hint_* / func_nav_* a few, func_nogrenades 4, trigger_catapult 2. Full list: docs/payload-census.txt.

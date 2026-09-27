@@ -1,13 +1,11 @@
 AddCSLuaFile("shared.lua")
 AddCSLuaFile("cl_init.lua")
-AddCSLuaFile("tf2/sh_core.lua")
-AddCSLuaFile("tf2/sh_soundscripts.lua")
-AddCSLuaFile("tf2/cl_hud.lua")
-AddCSLuaFile("tf2/cl_announcer.lua")
 
 include("shared.lua")
-include("tf2/sv_world.lua")
-include("tf2/sv_controlpoint.lua")
+
+for _, f in ipairs(GM:TF2Modules("sh_")) do AddCSLuaFile("tf2/" .. f) end
+for _, f in ipairs(GM:TF2Modules("cl_")) do AddCSLuaFile("tf2/" .. f) end
+for _, f in ipairs(GM:TF2Modules("sv_")) do include("tf2/" .. f) end
 
 -- Until there is a team picker, anyone without a TF2 team plays BLU so they
 -- can push the cart.
@@ -48,7 +46,7 @@ function GM:PlayerDeathThink(ply)
 	return self.BaseClass.PlayerDeathThink(self, ply)
 end
 
+-- Neither Sandbox nor base defines PostPlayerDeath.
 function GM:PostPlayerDeath(ply)
-	self.BaseClass.PostPlayerDeath(self, ply)
 	if IsValid(TF2.Rules) then TF2.Rules:OnPlayerDeath(ply) end
 end
