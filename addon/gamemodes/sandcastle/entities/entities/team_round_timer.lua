@@ -39,6 +39,7 @@ function ENT:Initialize()
 	self.setupLength = self.setupLength or 0
 	self.startPaused = self.startPaused or 1
 	self.showInHud = self.showInHud or 1
+	self.autoCountdown = self.autoCountdown or 1
 	self.enabled = self.startDisabled ~= 1
 	self.paused = true
 	self.inSetup = false
@@ -61,9 +62,12 @@ function ENT:TimeRemaining()
 	return math.max(0, self.endTime - CurTime())
 end
 
+-- Every change to the timer's length bumps a serial, which is how clients know
+-- to re-arm their countdown announcements (CalculateOutputMessages).
 function ENT:SetRemaining(seconds)
 	self.remaining = seconds
 	self.endTime = CurTime() + seconds
+	self.serial = (self.serial or 0) + 1
 	self:Publish()
 end
 
@@ -74,6 +78,8 @@ function ENT:Publish()
 	SetGlobal2Float("tf2.timer.left", self:TimeRemaining())
 	SetGlobal2Float("tf2.timer.end", CurTime() + self:TimeRemaining())
 	SetGlobal2Bool("tf2.timer.setup", self.inSetup)
+	SetGlobal2Bool("tf2.timer.autocountdown", self.autoCountdown ~= 0)
+	SetGlobal2Int("tf2.timer.serial", self.serial or 0)
 end
 
 function ENT:RoundStart()
@@ -127,7 +133,7 @@ function ENT:Think()
 	if left <= 0 then
 		if self.inSetup then
 			self:EndSetup()
-		elseif self.autoCountdown ~= 0 and not TimerMayExpire() then
+		elseif not TimerMayExpire() then
 			SetGlobal2Bool("tf2.overtime", true)
 		else
 			SetGlobal2Bool("tf2.overtime", false)
@@ -141,22 +147,35 @@ function ENT:Think()
 	return true
 end
 
-function ENT:AddTime(seconds)
+-- The announcer credits the team the time was added for (AddTeamTime), and
+-- says nothing once the round is decided (CTeamRoundTimer::AddTimerSeconds).
+local function AnnounceTimeAdded(team)
+	if IsValid(TF2.Rules) and (TF2.Rules:StateGet() == TF2.STATE.TEAM_WIN or TF2.Rules:StateGet() == TF2.STATE.STALEMATE) then return end
+	if team == TF2.TEAM_RED or team == TF2.TEAM_BLUE then
+		TF2.BroadcastSound(team, "Announcer.TimeAwardedForTeam")
+		TF2.BroadcastSound(TF2.EnemyOf(team), "Announcer.TimeAddedForEnemy")
+	else
+		TF2.BroadcastSound(TF2.TEAM_UNASSIGNED, "Announcer.TimeAdded")
+	end
+end
+
+function ENT:AddTime(seconds, team)
 	local left = self:TimeRemaining() + seconds
 	if self.maxLength > 0 and not self.inSetup then
 		left = math.min(left, self.maxLength)
 	end
 	if self.paused then self.remaining = left end
 	self:SetRemaining(left)
-	if seconds > 0 then
+	if seconds > 0 and self.showInHud == 1 then
 		TF2.Announce(string.format("+%d:%02d", math.floor(seconds / 60), seconds % 60), 0)
+		AnnounceTimeAdded(team)
 	end
 end
 
 local INPUTS = {
 	addteamtime = function(self, value)
 		local team, seconds = string.match(tostring(value), "(%d+)%s+(%-?%d+)")
-		self:AddTime(tonumber(seconds) or 0)
+		self:AddTime(tonumber(seconds) or 0, tonumber(team))
 	end,
 	addtime = function(self, value) self:AddTime(tonumber(value) or 0) end,
 	settime = function(self, value) self:SetRemaining(tonumber(value) or 0) end,
@@ -175,7 +194,7 @@ local INPUTS = {
 	enable = function(self) self.enabled = true self:Publish() end,
 	disable = function(self) self.enabled = false self:Publish() end,
 	showinhud = function(self, value) self.showInHud = tonumber(value) or 0 self:Publish() end,
-	autocountdown = function(self, value) self.autoCountdown = tonumber(value) or 0 end,
+	autocountdown = function(self, value) self.autoCountdown = tonumber(value) or 0 self:Publish() end,
 }
 
 function ENT:AcceptInput(name, activator, caller, value)

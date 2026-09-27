@@ -6,7 +6,9 @@
 -- are fired from the recording.
 
 -- team_control_point.h spawnflags
+local SF_HIDE_MODEL = 2
 local SF_NO_CAP_SOUNDS = 8
+local DEFAULT_MODEL = "models/effects/cappoint_hologram.mdl"
 
 local function State(ent)
 	local kv = TF2.KeyValues(ent)
@@ -15,6 +17,19 @@ local function State(ent)
 		kv.locked = kv.point_start_locked == "1"
 	end
 	return kv
+end
+
+-- CTeamControlPoint::SetModel: the owning team's model, bodygroup 0 set to the
+-- team, and skin 2 for neutral or team - 2 (0 RED, 1 BLU).
+function TF2.ApplyPointModel(ent)
+	local s = State(ent)
+	local team = s.owner
+	local model = s["team_model_" .. team]
+	if not model or model == "" then model = DEFAULT_MODEL end
+	if ent:GetModel() ~= model and util.IsValidModel(model) then ent:SetModel(model) end
+	ent:SetBodygroup(0, team)
+	ent:SetSkin(team == TF2.TEAM_UNASSIGNED and 2 or team - 2)
+	if bit.band(tonumber(s.spawnflags) or 0, SF_HIDE_MODEL) ~= 0 then ent:SetNoDraw(true) end
 end
 
 function TF2.CapTeam(ent)
@@ -34,6 +49,7 @@ function TF2.SetPointOwner(ent, team, activator)
 	local s = State(ent)
 	local old = s.owner
 	s.owner = team
+	TF2.ApplyPointModel(ent)
 	activator = activator or ent
 	if team == TF2.TEAM_UNASSIGNED then
 		TF2.FireOutput(ent, "OnCapReset", activator)
@@ -82,8 +98,19 @@ end)
 
 hook.Add("TF2RoundActive", "tf2.controlpoint", function()
 	for _, ent in ipairs(ents.FindByClass("team_control_point")) do
+		TF2.ApplyPointModel(ent)
 		local team = TF2.CapTeam(ent)
 		if team == TF2.TEAM_RED then TF2.FireOutput(ent, "OnRoundStartOwnedByTeam1", ent) end
 		if team == TF2.TEAM_BLUE then TF2.FireOutput(ent, "OnRoundStartOwnedByTeam2", ent) end
 	end
 end)
+
+-- Show each point in its owner's colours as soon as the map (or a round reset)
+-- has spawned, not only once the round goes active.
+local function ApplyAll()
+	for _, ent in ipairs(ents.FindByClass("team_control_point")) do
+		TF2.ApplyPointModel(ent)
+	end
+end
+hook.Add("InitPostEntity", "tf2.controlpoint", ApplyAll)
+hook.Add("PostCleanupMap", "tf2.controlpoint", ApplyAll)

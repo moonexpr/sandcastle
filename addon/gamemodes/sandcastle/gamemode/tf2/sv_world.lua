@@ -2,6 +2,20 @@
 
 util.AddNetworkString("tf2.announce")
 util.AddNetworkString("tf2.ready")
+util.AddNetworkString("tf2.sound")
+
+-- CTeamplayRoundBasedRules::BroadcastSound: a game sound every player of a
+-- team hears as their own (announcer lines, win/lose music). Team 0 is everyone.
+function TF2.BroadcastSound(team, name)
+	local recipients = {}
+	for _, ply in ipairs(player.GetAll()) do
+		if team == TF2.TEAM_UNASSIGNED or TF2.TeamOf(ply) == team then recipients[#recipients + 1] = ply end
+	end
+	if #recipients == 0 then return end
+	net.Start("tf2.sound")
+	net.WriteString(name)
+	net.Send(recipients)
+end
 
 -- Sent by the client once it has finished loading (InitPostEntity).
 net.Receive("tf2.ready", function(_, ply)
@@ -201,38 +215,15 @@ local function Occupied(spot)
 	return false
 end
 
-hook.Add("PlayerSelectSpawn", "tf2.teamspawn", function(ply)
-	if not TF2.Active() then return end
-	if TF2.TeamOf(ply) == TF2.TEAM_UNASSIGNED then ply:SetTeam(TF2.TEAM_BLUE) end
-	local points = TF2.SpawnPoints(TF2.TeamOf(ply))
-	if #points == 0 then return end
+-- A free enabled spawn point of the team, starting from a random one; an
+-- occupied point only when every point is taken; nil when the team has none.
+function TF2.PickSpawn(team)
+	local points = TF2.SpawnPoints(team)
+	if #points == 0 then return nil end
 	local start = math.random(#points)
 	for i = 0, #points - 1 do
 		local spot = points[(start + i - 1) % #points + 1]
 		if not Occupied(spot) then return spot end
 	end
 	return points[start]
-end)
-
--- Until there is a team picker, anyone without a TF2 team joins BLU so they
--- can push the cart. Other addons set teams in their own spawn hooks (one puts
--- players on a "Runner" team), so this runs a tick later, after them.
-local function AssignDefaultTeam(ply)
-	timer.Simple(0, function()
-		if IsValid(ply) and TF2.Active() and TF2.TeamOf(ply) == TF2.TEAM_UNASSIGNED then
-			ply:SetTeam(TF2.TEAM_BLUE)
-		end
-	end)
 end
-hook.Add("PlayerInitialSpawn", "tf2.defaultteam", AssignDefaultTeam)
-hook.Add("PlayerSpawn", "tf2.defaultteam", AssignDefaultTeam)
-
--- Respawning belongs to tf_gamerules' respawn waves while it is running.
-hook.Add("PlayerDeathThink", "tf2.respawnwaves", function(ply)
-	if TF2.Active() then return false end
-end)
-
-local function NoteDeath(ply)
-	if IsValid(TF2.Rules) then TF2.Rules:OnPlayerDeath(ply) end
-end
-hook.Add("PostPlayerDeath", "tf2.respawnwaves", NoteDeath)

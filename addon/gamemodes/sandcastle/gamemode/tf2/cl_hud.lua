@@ -6,14 +6,10 @@ surface.CreateFont("TF2Ents.Announce", { font = "Roboto", size = 42, weight = 90
 
 -- The top-centre of the screen can sit under a display notch (MacBook), so
 -- the timer is pushed down by a fraction of the screen height.
-local timer_y = CreateClientConVar("tf2_hud_timer_y", "0.08", true, false, "Timer box top, as a fraction of screen height (clears display notches).")
+local timer_y = CreateClientConVar("castle_hud_timer_y", "0.08", true, false, "Timer box top, as a fraction of screen height (clears display notches).")
 
 local announcement
 
-hook.Add("InitPostEntity", "tf2.ready", function()
-	net.Start("tf2.ready")
-	net.SendToServer()
-end)
 
 net.Receive("tf2.announce", function()
 	announcement = {
@@ -111,12 +107,11 @@ local function DrawPreround(w, h)
 	draw.SimpleTextOutlined("Round begins in " .. left, "TF2Ents.Announce", w / 2, h * 0.35, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, color_black)
 end
 
-hook.Add("HUDPaint", "tf2.hud", function()
-	if not TF2.Active() then return end
+function TF2.DrawHUD()
 	local w, h = ScrW(), ScrH()
 	DrawTimer(w, h)
 	DrawCart(w, h)
 	DrawPreround(w, h)
 	DrawAnnouncement(w, h)
 	DrawRespawn(w, h)
-end)
+end

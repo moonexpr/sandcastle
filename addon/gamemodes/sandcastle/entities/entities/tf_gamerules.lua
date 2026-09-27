@@ -7,9 +7,14 @@ ENT.Base = "base_point"
 
 local S = TF2.STATE
 
-local respawnwavetime = CreateConVar("tf2_respawnwavetime", "10", FCVAR_ARCHIVE, "Default respawn wave length (mp_respawnwavetime).")
-local bonusroundtime = CreateConVar("tf2_bonusroundtime", "15", FCVAR_ARCHIVE, "Time after a round win until the next round (mp_bonusroundtime).")
-local preroundtime = CreateConVar("tf2_preroundtime", "5", FCVAR_ARCHIVE, "Pre-round freeze length (5 * mp_enableroundwaittime).")
+-- TF2's own convars, as teamplayroundbased_gamerules.cpp defines them.
+local respawnwavetime = CreateConVar("mp_respawnwavetime", "10.0", { FCVAR_NOTIFY, FCVAR_REPLICATED }, "Time between respawn waves.")
+local bonusroundtime = CreateConVar("mp_bonusroundtime", "15", FCVAR_REPLICATED, "Time after round win until round restarts", 5, 15)
+local enableroundwaittime = CreateConVar("mp_enableroundwaittime", "1", FCVAR_REPLICATED, "Enable timers to wait between rounds.")
+
+-- The pre-round lasts this many seconds times mp_enableroundwaittime. TF2's
+-- State_Enter_PREROUND uses 5; Sandcastle uses 3.
+local PREROUND_SECONDS = 3
 
 -- GetMinTimeWhenPlayerMaySpawn: 2s death animation plus the freezecam's
 -- spec_freeze_traveltime (0.4) and spec_freeze_time (4).
@@ -83,7 +88,7 @@ end
 
 function ENT:StateEnter_PREROUND()
 	self:RoundRespawn()
-	self.transitionAt = CurTime() + preroundtime:GetFloat()
+	self.transitionAt = CurTime() + PREROUND_SECONDS * enableroundwaittime:GetFloat()
 	SetGlobal2Float("tf2.preroundEnd", self.transitionAt)
 end
 
@@ -104,11 +109,15 @@ function ENT:StateEnter_TEAM_WIN()
 	if self.forceMapReset then self.roundsPlayed = self.roundsPlayed + 1 end
 	self.transitionAt = CurTime() + bonusroundtime:GetFloat()
 	local winner = self.winningTeam
+	-- PlayWinSong: each side hears its own result.
 	if winner ~= 0 then
 		self.score[winner] = self.score[winner] + 1
 		TF2.Announce(TF2.TeamName[winner] .. " WINS!", winner)
+		TF2.BroadcastSound(winner, "Game.YourTeamWon")
+		TF2.BroadcastSound(TF2.EnemyOf(winner), "Game.YourTeamLost")
 	else
 		TF2.Announce("STALEMATE", 0)
+		TF2.BroadcastSound(TF2.TEAM_UNASSIGNED, "Game.Stalemate")
 	end
 	hook.Run("TF2RoundWin", winner)
 end

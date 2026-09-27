@@ -5,7 +5,7 @@
 ENT.Type = "point"
 ENT.Base = "base_point"
 
-local recede_time = CreateConVar("tf2_escort_recede_time", "30", FCVAR_ARCHIVE, "Seconds without pushers before the cart recedes (tf_escort_recede_time).")
+local recede_time = CreateConVar("tf_escort_recede_time", "30", 0, "Seconds without pushers before the cart recedes.", 0)
 
 local HILL_NONE, HILL_UP, HILL_DOWN = 0, 1, 2
 local SF_PATH_UPHILL, SF_PATH_DOWNHILL = 0x20, 0x40

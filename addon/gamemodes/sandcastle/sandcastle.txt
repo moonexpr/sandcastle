@@ -1,0 +1,8 @@
+"sandcastle"
+{
+	"base"		"sandbox"
+	"title"		"Sandcastle"
+	"maps"		"^pl_|^plr_|^cp_|^koth_"
+	"category"	"pvp"
+	"menusystem"	"1"
+}

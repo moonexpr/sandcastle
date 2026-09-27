@@ -29,11 +29,6 @@ TF2.TeamColor = {
 	[3] = Color(91, 122, 140),
 }
 
--- GMod's team library reserves 0, 1001 and 1002, so TF2's own numbers are
--- free to register as they are.
-team.SetUp(TF2.TEAM_RED, "RED", TF2.TeamColor[TF2.TEAM_RED], false)
-team.SetUp(TF2.TEAM_BLUE, "BLU", TF2.TeamColor[TF2.TEAM_BLUE], false)
-
 local PLAYABLE = { [TF2.TEAM_RED] = true, [TF2.TEAM_BLUE] = true }
 
 function TF2.TeamOf(ent)
@@ -57,16 +52,15 @@ function TF2.State()
 	return GetGlobal2Int("tf2.state", TF2.STATE.INIT)
 end
 
--- tf_player_movement_restart_freeze; the map's SetRoundRespawnFreezeEnabled
--- input sets it. Replicated so client prediction freezes too.
-TF2.RestartFreeze = CreateConVar("tf2_player_movement_restart_freeze", "1", { FCVAR_ARCHIVE, FCVAR_REPLICATED },
-	"Freeze player movement during the pre-round (tf_player_movement_restart_freeze).")
+-- TF2's convar; the map's SetRoundRespawnFreezeEnabled input sets it.
+-- Replicated, so client prediction freezes too.
+TF2.RestartFreeze = CreateConVar("tf_player_movement_restart_freeze", "1", FCVAR_REPLICATED,
+	"When set, prevent player movement during round restart")
 
--- During pre-round players may look around and shoot but not move
--- (CTFPlayer::CanPlayerMove); the losing team cannot attack while the winners
--- celebrate (TF2's humiliation).
-hook.Add("StartCommand", "tf2.roundstate", function(ply, cmd)
-	if not TF2.Active() then return end
+-- The input restrictions of the round states: during pre-round players may
+-- look around and shoot but not move (CTFPlayer::CanPlayerMove); the losing
+-- team cannot attack while the winners celebrate (TF2's humiliation).
+function TF2.RestrictCommand(ply, cmd)
 	local state = TF2.State()
 	if state == TF2.STATE.PREROUND then
 		if not TF2.RestartFreeze:GetBool() then return end
@@ -80,4 +74,4 @@ hook.Add("StartCommand", "tf2.roundstate", function(ply, cmd)
 			cmd:RemoveKey(IN_ATTACK2)
 		end
 	end
-end)
+end
