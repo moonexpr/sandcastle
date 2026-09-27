@@ -5,7 +5,7 @@ ENT.Type = "brush"
 ENT.Base = "tf2_brush_volume"
 
 local NEXT_USE_TIME = 3.0
-local SOUND = "items/regenerate.wav"
+local SOUND = "Regenerate.Touch"
 
 function ENT:VolumeInit()
 	self.associatedModel = self:Key("associatedmodel")

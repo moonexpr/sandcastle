@@ -13,8 +13,8 @@ ENT.Kind = "health"
 if CLIENT then return end
 
 local SOUNDS = {
-	health = "items/smallmedkit1.wav",
-	ammo = "items/ammo_pickup.wav",
+	health = "HealthKit.Touch",
+	ammo = "AmmoPack.Touch",
 }
 
 function ENT:Initialize()
