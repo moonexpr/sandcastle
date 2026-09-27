@@ -10,6 +10,11 @@ local timer_y = CreateClientConVar("tf2_hud_timer_y", "0.08", true, false, "Time
 
 local announcement
 
+hook.Add("InitPostEntity", "tf2.ready", function()
+	net.Start("tf2.ready")
+	net.SendToServer()
+end)
+
 net.Receive("tf2.announce", function()
 	announcement = {
 		text = net.ReadString(),
@@ -100,11 +105,18 @@ local function DrawRespawn(w, h)
 	draw.SimpleTextOutlined(text, "TF2Ents.Label", w / 2, h * 0.7, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
 end
 
+local function DrawPreround(w, h)
+	if TF2.State() ~= TF2.STATE.PREROUND then return end
+	local left = math.max(1, math.ceil(GetGlobal2Float("tf2.preroundEnd", 0) - CurTime()))
+	draw.SimpleTextOutlined("Round begins in " .. left, "TF2Ents.Announce", w / 2, h * 0.35, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, color_black)
+end
+
 hook.Add("HUDPaint", "tf2.hud", function()
 	if not TF2.Active() then return end
 	local w, h = ScrW(), ScrH()
 	DrawTimer(w, h)
 	DrawCart(w, h)
+	DrawPreround(w, h)
 	DrawAnnouncement(w, h)
 	DrawRespawn(w, h)
 end)

@@ -57,14 +57,22 @@ function TF2.State()
 	return GetGlobal2Int("tf2.state", TF2.STATE.INIT)
 end
 
--- Players cannot move during pre-round, and the losing team cannot attack
--- while the winners celebrate (TF2's humiliation), as in TF2.
+-- tf_player_movement_restart_freeze; the map's SetRoundRespawnFreezeEnabled
+-- input sets it. Replicated so client prediction freezes too.
+TF2.RestartFreeze = CreateConVar("tf2_player_movement_restart_freeze", "1", { FCVAR_ARCHIVE, FCVAR_REPLICATED },
+	"Freeze player movement during the pre-round (tf_player_movement_restart_freeze).")
+
+-- During pre-round players may look around and shoot but not move
+-- (CTFPlayer::CanPlayerMove); the losing team cannot attack while the winners
+-- celebrate (TF2's humiliation).
 hook.Add("StartCommand", "tf2.roundstate", function(ply, cmd)
 	if not TF2.Active() then return end
 	local state = TF2.State()
 	if state == TF2.STATE.PREROUND then
+		if not TF2.RestartFreeze:GetBool() then return end
 		cmd:ClearMovement()
 		cmd:RemoveKey(IN_JUMP)
+		cmd:RemoveKey(IN_DUCK)
 	elseif state == TF2.STATE.TEAM_WIN then
 		local winner = GetGlobal2Int("tf2.winner", 0)
 		if winner ~= 0 and TF2.TeamOf(ply) ~= winner then

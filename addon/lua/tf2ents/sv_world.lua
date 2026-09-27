@@ -1,6 +1,12 @@
 -- Server-side world helpers shared by the TF2 entities.
 
 util.AddNetworkString("tf2.announce")
+util.AddNetworkString("tf2.ready")
+
+-- Sent by the client once it has finished loading (InitPostEntity).
+net.Receive("tf2.ready", function(_, ply)
+	ply.tf2Ready = true
+end)
 
 -- Keyvalues of engine entities we read but do not implement. GMod exposes no
 -- getter for a path_track's next node or a teamspawn's team, so they are

@@ -69,14 +69,22 @@ function ENT:TransitionDue()
 	return self.transitionAt and CurTime() >= self.transitionAt
 end
 
--- TF2 waits for players before the first round.
+-- TF2 waits for players before the first round. A player counts once their
+-- client has finished loading, so the pre-round freeze is not spent on a
+-- loading screen.
 function ENT:StateThink_PREGAME()
-	if #player.GetAll() > 0 then self:StateTransition(S.PREROUND) end
+	for _, ply in ipairs(player.GetAll()) do
+		if ply.tf2Ready then
+			self:StateTransition(S.PREROUND)
+			return
+		end
+	end
 end
 
 function ENT:StateEnter_PREROUND()
 	self:RoundRespawn()
 	self.transitionAt = CurTime() + preroundtime:GetFloat()
+	SetGlobal2Float("tf2.preroundEnd", self.transitionAt)
 end
 
 function ENT:StateThink_PREROUND()
@@ -257,7 +265,9 @@ local INPUTS = {
 	playvored = Ignore,
 	playvoblue = Ignore,
 	handlemapevent = Ignore,
-	setroundrespawnfreezeenabled = Ignore,
+	setroundrespawnfreezeenabled = function(self, value)
+		TF2.RestartFreeze:SetBool(tonumber(value) ~= 0 and tostring(value) ~= "false")
+	end,
 	setmapforcedtruceduringbossfight = Ignore,
 	setctfcapturebonustime = Ignore,
 	setcustomupgradesfile = Ignore,
