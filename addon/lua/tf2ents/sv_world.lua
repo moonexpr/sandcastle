@@ -174,11 +174,13 @@ hook.Add("AcceptInput", "tf2.pathtrack", function(ent, input)
 	end
 end)
 
+-- Enabled spawn points of a team. Points marked MatchSummary stand in the
+-- end-of-match podium room and are only used for that screen in TF2.
 function TF2.SpawnPoints(team)
 	local points = {}
 	for _, ent in ipairs(ents.FindByClass("info_player_teamspawn")) do
 		local kv = TF2.KeyValues(ent)
-		if kv.startdisabled ~= "1" and tonumber(kv.teamnum) == team then
+		if kv.startdisabled ~= "1" and kv.matchsummary ~= "1" and tonumber(kv.teamnum) == team then
 			points[#points + 1] = ent
 		end
 	end
@@ -195,6 +197,7 @@ end
 
 hook.Add("PlayerSelectSpawn", "tf2.teamspawn", function(ply)
 	if not TF2.Active() then return end
+	if TF2.TeamOf(ply) == TF2.TEAM_UNASSIGNED then ply:SetTeam(TF2.TEAM_BLUE) end
 	local points = TF2.SpawnPoints(TF2.TeamOf(ply))
 	if #points == 0 then return end
 	local start = math.random(#points)

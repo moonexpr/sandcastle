@@ -5,12 +5,14 @@
   gmod_lua.py --realm cl -f script.lua         run a file on the clients
   gmod_lua.py --realm sh 'return CLIENT'       run on both
 
-luadev's socketdev listens on 127.0.0.1:27099 and has no reply channel, so the
-code is wrapped in markers and its output is read back from console.log, which
-GMod writes only when launched with -condebug. Values the chunk returns are
-printed as @@RET lines; an error as one @@ERR line.
+luadev's socketdev listens on 127.0.0.1:27099 (only once a game is loaded) and
+has no reply channel. So the chunk is wrapped: while it runs, print and MsgN
+are captured, and afterwards its output, return values and any error are
+written as JSON to garrysmod/data/gmod_lua/<run id>_<realm>.txt, which this
+script polls for and then deletes.
 """
 import argparse
+import json
 import socket
 import sys
 import time
@@ -23,7 +25,7 @@ GMOD = Path.home() / (
     "Library/Application Support/CrossOver/Bottles/Team Fortress 2/"
     "drive_c/Steam/steamapps/common/GarrysMod/garrysmod"
 )
-CONSOLE_LOG = GMOD / "console.log"
+RESULTS = GMOD / "data" / "gmod_lua"
 LUADEV = ("127.0.0.1", 27099)
 
 
@@ -55,41 +57,52 @@ def long_string(code: str) -> str:
 
 def wrap(code: str, run_id: str) -> str:
     return f"""do
-local id = "{run_id}"
-print("@@LUADEV-BEGIN {run_id} " .. (SERVER and "sv" or "cl"))
-local fn = CompileString({long_string(code)}, "gmod_lua:" .. id, false)
+local realm = SERVER and "sv" or "cl"
+local out = {{}}
+local function capture(...)
+  local parts = {{}}
+  for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end
+  out[#out + 1] = table.concat(parts, "\\t")
+end
+local saved_print, saved_msgn = print, MsgN
+local result = {{ output = out, returns = {{}} }}
+local fn = CompileString({long_string(code)}, "gmod_lua", false)
 if isstring(fn) then
-  print("@@ERR " .. fn)
+  result.error = fn
 else
+  print, MsgN = capture, capture
   local r = {{ pcall(fn) }}
+  print = saved_print
+  MsgN = saved_msgn
   if r[1] then
-    for i = 2, table.maxn(r) do print("@@RET " .. tostring(r[i])) end
+    for i = 2, table.maxn(r) do result.returns[#result.returns + 1] = tostring(r[i]) end
   else
-    print("@@ERR " .. tostring(r[2]))
+    result.error = tostring(r[2])
   end
 end
-print("@@LUADEV-END {run_id}")
+file.CreateDir("gmod_lua")
+file.Write("gmod_lua/{run_id}_" .. realm .. ".txt", util.TableToJSON(result))
 end"""
 
 
-def extract_runs(log: str, run_id: str) -> list[RunResult]:
-    runs, current = [], None
-    for line in log.splitlines():
-        if line.startswith(f"@@LUADEV-BEGIN {run_id} "):
-            current = (Realm(line.rsplit(" ", 1)[1]), [], [], [None])
-        elif current is None:
+def result_files(directory: Path, run_id: str, realm: Realm) -> list[Path]:
+    realms = [Realm.SERVER, Realm.CLIENT] if realm is Realm.SHARED else [realm]
+    return [directory / f"{run_id}_{r.value}.txt" for r in realms]
+
+
+def collect_results(directory: Path, run_id: str, realm: Realm) -> list[RunResult]:
+    results = []
+    for path in result_files(directory, run_id, realm):
+        if not path.exists():
             continue
-        elif line == f"@@LUADEV-END {run_id}":
-            realm, output, returns, error = current
-            runs.append(RunResult(realm, output, returns, error[0]))
-            current = None
-        elif line.startswith("@@RET "):
-            current[2].append(line[6:])
-        elif line.startswith("@@ERR "):
-            current[3][0] = line[6:]
-        else:
-            current[1].append(line)
-    return runs
+        data = json.loads(path.read_text())
+        results.append(RunResult(
+            Realm(path.stem.rsplit("_", 1)[1]),
+            list(data.get("output") or []),
+            list(data.get("returns") or []),
+            data.get("error"),
+        ))
+    return results
 
 
 def send(realm: Realm, code: str, label: str) -> None:
@@ -97,25 +110,23 @@ def send(realm: Realm, code: str, label: str) -> None:
         with socket.create_connection(LUADEV, timeout=3) as s:
             s.sendall(f"{realm.value}\n{label}\n{code}".encode())
     except OSError as e:
-        raise BridgeDown(f"luadev socket {LUADEV[0]}:{LUADEV[1]} not reachable ({e}); is GMod running with luadev?") from e
+        raise BridgeDown(f"luadev socket {LUADEV[0]}:{LUADEV[1]} not reachable ({e}); is a map loaded in GMod?") from e
 
 
 def run(realm: Realm, code: str, timeout: float) -> list[RunResult]:
-    if not CONSOLE_LOG.exists():
-        raise BridgeDown(f"{CONSOLE_LOG} missing; launch GMod with -condebug")
-    start = CONSOLE_LOG.stat().st_size
     run_id = uuid.uuid4().hex[:10]
     send(realm, wrap(code, run_id), "gmod_lua")
-    expected = 2 if realm is Realm.SHARED else 1
+    expected = len(result_files(RESULTS, run_id, realm))
     deadline = time.monotonic() + timeout
+    results = []
     while time.monotonic() < deadline:
-        with CONSOLE_LOG.open("rb") as f:
-            f.seek(start)
-            runs = extract_runs(f.read().decode("utf-8", "replace"), run_id)
-        if len(runs) >= expected:
-            return runs
+        results = collect_results(RESULTS, run_id, realm)
+        if len(results) >= expected:
+            break
         time.sleep(0.2)
-    return runs
+    for path in result_files(RESULTS, run_id, realm):
+        path.unlink(missing_ok=True)
+    return results
 
 
 def main() -> int:
@@ -129,15 +140,15 @@ def main() -> int:
     if code is None:
         ap.error("give code or --file")
     try:
-        runs = run(Realm(args.realm), code, args.timeout)
+        results = run(Realm(args.realm), code, args.timeout)
     except BridgeDown as e:
         print(f"bridge down: {e}", file=sys.stderr)
         return 2
-    if not runs:
-        print("no result before the timeout (did the chunk hang, or is the map not loaded?)", file=sys.stderr)
+    if not results:
+        print("no result before the timeout (did the chunk hang, or is luadev refusing this player?)", file=sys.stderr)
         return 3
     failed = False
-    for r in runs:
+    for r in results:
         print(f"[{r.realm.value}]")
         for line in r.output:
             print(line)
