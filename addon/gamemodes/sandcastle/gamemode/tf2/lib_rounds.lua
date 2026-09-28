@@ -394,6 +394,17 @@ function R.WinPanel(info)
 	return panel
 end
 
+-- CHudStalemate::SetupStalematePanel
+local STALEMATE_REASON = {
+	[R.STALEMATE.JOIN_MID] = "Sit back and relax while you wait for this petty conflict to end.",
+	[R.STALEMATE.TIMER] = "You've run out of time. Watch your back and finish 'em off. No more spawning.",
+	[R.STALEMATE.SERVER_TIMELIMIT] = "Map time limit reached. No more spawning, so make this count.",
+}
+
+function R.StalematePanel(reason)
+	return { title = "SUDDEN DEATH!", reason = STALEMATE_REASON[reason] }
+end
+
 -- Localization ---------------------------------------------------------------------------
 
 local function Utf16(s)

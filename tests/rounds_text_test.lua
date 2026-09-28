@@ -37,6 +37,13 @@ T.test("sudden death wins by killing everyone", function()
 	T.eq(p.reason, "RED killed all opponents during sudden death")
 end)
 
+T.test("sudden death explains why it started", function()
+	local p = R.StalematePanel(R.STALEMATE.TIMER)
+	T.eq(p.title, "SUDDEN DEATH!")
+	T.eq(p.reason, "You've run out of time. Watch your back and finish 'em off. No more spawning.")
+	T.eq(R.StalematePanel(R.STALEMATE.SERVER_TIMELIMIT).reason, "Map time limit reached. No more spawning, so make this count.")
+end)
+
 local function Utf16(s)
 	return (string.gsub(s, ".", function(c) return c .. "\0" end))
 end
