@@ -13,6 +13,22 @@ local function SendFoundation(dir)
 end
 SendFoundation("foundation/")
 
+-- Every feature's client parts are sent as source; nothing runs until the
+-- server loads the feature and tells clients (WETSAND.Feature, sh_core.lua).
+-- sv.lua stays on the server.
+local function SendFeatureClientParts()
+	local Features = WETSAND.require("foundation.features")
+	local root = GM.FolderName .. "/gamemode/"
+	local _, names = file.Find(root .. Features.ROOT .. "*", "LUA")
+	for _, name in ipairs(names) do
+		for _, part in ipairs(Features.CLIENT_PARTS) do
+			local path = Features.PartPath(name, part)
+			if file.Exists(root .. path, "LUA") then AddCSLuaFile(path) end
+		end
+	end
+end
+SendFeatureClientParts()
+
 for _, f in ipairs(GM:TF2Modules("sh_")) do AddCSLuaFile("wetsand/" .. f) end
 for _, f in ipairs(GM:TF2Modules("cl_")) do AddCSLuaFile("wetsand/" .. f) end
 for _, f in ipairs(GM:TF2Modules("sv_")) do include("wetsand/" .. f) end

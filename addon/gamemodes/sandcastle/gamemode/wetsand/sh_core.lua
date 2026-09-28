@@ -20,6 +20,100 @@ function WETSAND.require(name)
 end
 CHUNK_ENV.require = WETSAND.require
 
+-- Per-map features (foundation.features): an entity calls WETSAND.Feature on
+-- first use, never at file top level, so a map loads only the controllers
+-- and views its entities pull in. The server tells ready clients each new
+-- feature with a client part, and a joining client, once ready, every one
+-- loaded so far, in load order. Both directions use one net message: from a
+-- client it means "ready", from the server a list of features to load.
+local Features = WETSAND.require("foundation.features")
+local FEATURE_NET = "wetsand.feature"
+local FEATURE_COUNT_BITS = 16
+
+local FeatureFiles = {}
+
+function FeatureFiles:Exists(path)
+	return file.Exists(GAMEMODE_ROOT .. path, "LUA")
+end
+
+-- CompileFile rather than include, so an error in the file reaches the
+-- caller. CompileFile prints a syntax error itself and returns no function.
+function FeatureFiles:Run(path)
+	local chunk = CompileFile(GAMEMODE_ROOT .. path)
+	if not isfunction(chunk) then error(path .. " did not compile", 0) end
+	return chunk()
+end
+
+local function ReadyPlayers()
+	local ready = {}
+	for _, ply in ipairs(player.GetAll()) do
+		if ply.wetsandFeaturesReady then ready[#ready + 1] = ply end
+	end
+	return ready
+end
+
+local function SendFeatures(names, recipients)
+	net.Start(FEATURE_NET)
+	net.WriteUInt(#names, FEATURE_COUNT_BITS)
+	for _, name in ipairs(names) do net.WriteString(name) end
+	net.Send(recipients)
+end
+
+function FeatureFiles:TellClients(name)
+	local ready = ReadyPlayers()
+	if #ready > 0 then SendFeatures({ name }, ready) end
+end
+
+-- Kept across a Lua refresh, since entities hold the controllers it returned.
+WETSAND.FeatureLoader = WETSAND.FeatureLoader
+	or Features.New(SERVER and Features.SERVER or Features.CLIENT, FeatureFiles)
+
+-- The server's controller or the client's view for a feature, loaded once.
+function WETSAND.Feature(name)
+	return WETSAND.FeatureLoader:Feature(name)
+end
+
+-- collectgarbage("count") before and after a full collection, and the loaded
+-- features, to compare maps' Lua RAM.
+local function MemoryReport()
+	local count = collectgarbage("count")
+	collectgarbage("collect")
+	return WETSAND.FeatureLoader:MemoryReport(count, collectgarbage("count"))
+end
+
+if SERVER then
+	util.AddNetworkString(FEATURE_NET)
+
+	net.Receive(FEATURE_NET, function(_, ply)
+		ply.wetsandFeaturesReady = true
+		SendFeatures(WETSAND.FeatureLoader:ClientFeatures(), ply)
+	end)
+
+	-- A full collection stalls the server, so players need admin.
+	concommand.Add("wetsand_memory", function(ply)
+		if IsValid(ply) and not ply:IsAdmin() then return end
+		local report = MemoryReport()
+		print(report)
+		if IsValid(ply) then ply:PrintMessage(HUD_PRINTCONSOLE, report) end
+	end, nil, "Print the server's Lua memory and the features this map loaded")
+else
+	net.Receive(FEATURE_NET, function()
+		local names = {}
+		for i = 1, net.ReadUInt(FEATURE_COUNT_BITS) do names[i] = net.ReadString() end
+		for _, name in ipairs(names) do WETSAND.Feature(name) end
+	end)
+
+	-- Net messages reach the client from InitPostEntity on.
+	hook.Add("InitPostEntity", "wetsand.feature", function()
+		net.Start(FEATURE_NET)
+		net.SendToServer()
+	end)
+
+	concommand.Add("wetsand_memory_cl", function()
+		print(MemoryReport())
+	end, nil, "Print this client's Lua memory and the features it loaded")
+end
+
 -- Pure rule libraries (gamemode/foundation/), shared so client prediction and
 -- drawing follow the same rules as the server.
 WETSAND.TeamRules = WETSAND.require("foundation.teams")
