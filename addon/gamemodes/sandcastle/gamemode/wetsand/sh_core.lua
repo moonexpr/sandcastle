@@ -2,6 +2,18 @@
 -- keep TF2's values so map keyvalues (TeamNum=2/3) mean the same thing here.
 WETSAND = WETSAND or {}
 
+-- Lua 5.1's require for the gamemode's module(...) files (gamemode/foundation/):
+-- GMod's include passes no name to the chunk, so load it here, once, calling
+-- it with the dotted name. GM exists only while the gamemode loads.
+local GAMEMODE_ROOT = GM.FolderName .. "/gamemode/"
+
+function WETSAND.require(name)
+	if package.loaded[name] == nil then
+		CompileFile(GAMEMODE_ROOT .. name:gsub("%.", "/") .. ".lua")(name)
+	end
+	return package.loaded[name]
+end
+
 WETSAND.TEAM_UNASSIGNED = 0
 WETSAND.TEAM_SPECTATOR = 1
 WETSAND.TEAM_RED = 2

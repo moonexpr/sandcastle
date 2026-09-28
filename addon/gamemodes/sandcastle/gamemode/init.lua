@@ -3,6 +3,11 @@ AddCSLuaFile("cl_init.lua")
 
 include("shared.lua")
 
+-- Foundation modules are pure logic, safe to send; clients load them with WETSAND.require.
+for _, f in ipairs(file.Find(GM.FolderName .. "/gamemode/foundation/*.lua", "LUA")) do
+	AddCSLuaFile("foundation/" .. f)
+end
+
 for _, f in ipairs(GM:TF2Modules("sh_")) do AddCSLuaFile("wetsand/" .. f) end
 for _, f in ipairs(GM:TF2Modules("cl_")) do AddCSLuaFile("wetsand/" .. f) end
 for _, f in ipairs(GM:TF2Modules("sv_")) do include("wetsand/" .. f) end

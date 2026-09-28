@@ -1,12 +1,21 @@
 -- Minimal harness for Sandcastle's pure-logic libraries, run under plain
--- LuaJIT (no GMod). Libraries under test live in gamemode/wetsand/lib_*.lua and
--- use no GMod globals, so a test loads them with dofile.
+-- LuaJIT (no GMod). Libraries under test live in gamemode/foundation/*.lua and
+-- use no GMod globals, so a test loads them with T.require.
 local T = { passed = 0, failed = 0 }
 
-T.ROOT = "addon/gamemodes/sandcastle/gamemode/wetsand/"
+T.ROOT = "addon/gamemodes/sandcastle/gamemode/"
+
+-- Lua 5.1's require for a module(...) file under T.ROOT, as WETSAND.require
+-- does in the game: once, calling the chunk with its dotted name.
+function T.require(name)
+	if package.loaded[name] == nil then
+		assert(loadfile(T.ROOT .. name:gsub("%.", "/") .. ".lua"))(name)
+	end
+	return package.loaded[name]
+end
 
 function T.lib(name)
-	return dofile(T.ROOT .. "lib_" .. name .. ".lua")
+	return dofile(T.ROOT .. "wetsand/lib_" .. name .. ".lua")
 end
 
 function T.test(name, fn)
