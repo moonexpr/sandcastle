@@ -4,12 +4,13 @@
 -- round win, the stage-outcome line each side hears. The carts are compared
 -- as CTFGameRules does it (PlayTrainCaptureAlert, Helltower lines): by each
 -- watcher's distance along its track.
-local R = {}
+local pairs, string = pairs, string
+module(...)
 
 local RED, BLU = 2, 3
 
 -- distances = { [team] = distance along track }; the team ahead, or 0 when level.
-function R.Leader(distances)
+function Leader(distances)
 	local red, blu = distances[RED] or 0, distances[BLU] or 0
 	if red > blu then return RED end
 	if blu > red then return BLU end
@@ -18,7 +19,7 @@ end
 
 -- CTeamTrainWatcherMaster::FireGameEvent("teamplay_round_win"): winner and
 -- loser each hear their line; full_round picks the final-stage pair.
-function R.OutcomeLines(winner, fullRound)
+function OutcomeLines(winner, fullRound)
 	if winner ~= RED and winner ~= BLU then return {} end
 	local loser = winner == RED and BLU or RED
 	local stage = fullRound and "Final" or "First"
@@ -38,7 +39,7 @@ local LINES = {
 	FinalStageStart = 9,
 }
 
-function R.Sounds()
+function Sounds()
 	local sounds = {}
 	for stem, count in pairs(LINES) do
 		for n = 1, count do
@@ -48,5 +49,3 @@ function R.Sounds()
 	end
 	return sounds
 end
-
-return R

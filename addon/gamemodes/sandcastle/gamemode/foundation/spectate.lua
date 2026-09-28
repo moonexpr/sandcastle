@@ -6,17 +6,18 @@
 -- Target descriptors: { id, kind = "player"|"point"|"entity", team,
 --   alive, deathTime (players), enabled, associatedTeam (points), train (entities) }.
 -- Viewer: { id, team }. Rules: { forcecamera, teamWin, now }.
-local S = {}
+local ipairs = ipairs
+module(...)
 
-S.TEAM_SPECTATOR = 1
-S.FIRST_GAME_TEAM = 2
+TEAM_SPECTATOR = 1
+FIRST_GAME_TEAM = 2
 
 -- mp_forcecamera values (shareddefs.h OBS_ALLOW_*)
-S.FORCE_ALL = 0
-S.FORCE_TEAM = 1
-S.FORCE_NONE = 2
+FORCE_ALL = 0
+FORCE_TEAM = 1
+FORCE_NONE = 2
 
-S.TIMES = {
+TIMES = {
 	deathAnim = 2.0,         -- TF_DEATH_ANIMATION_TIME
 	freezeTravel = 0.4,      -- spec_freeze_traveltime
 	freezeTime = 4.0,        -- spec_freeze_time
@@ -24,7 +25,6 @@ S.TIMES = {
 	freezeSoundLength = 0.3, -- StateThinkDYING's TFPlayer.FreezeCam lead
 	watchDead = 3.0,         -- DEATH_ANIMATION_TIME (baseplayer_shared.h)
 }
-local TIMES = S.TIMES
 
 local function FreezeEnd(deathTime)
 	return deathTime + TIMES.deathAnim + TIMES.freezeTravel + TIMES.freezeTime
@@ -33,25 +33,25 @@ end
 -- CTFPlayer::StateThinkDYING: deathcam for the death animation, then the
 -- freezecam on the killer, then observing. Without a killer the deathcam
 -- holds until the freezecam would have ended, since nobody respawns earlier.
-function S.DeathPhase(now, deathTime, hasKiller, aborted)
+function DeathPhase(now, deathTime, hasKiller, aborted)
 	if not deathTime or aborted then return "observer" end
 	if now < deathTime + TIMES.deathAnim then return "deathcam" end
 	if now >= FreezeEnd(deathTime) then return "observer" end
 	return hasKiller and "freezecam" or "deathcam"
 end
 
-function S.CanAbortFreezeCam(now, deathTime)
+function CanAbortFreezeCam(now, deathTime)
 	return now >= deathTime + TIMES.deathAnim + TIMES.freezeTravel + TIMES.abortGrace
 end
 
-function S.FreezeSoundTime(deathTime)
+function FreezeSoundTime(deathTime)
 	return deathTime + TIMES.deathAnim + TIMES.freezeTravel - TIMES.freezeSoundLength
 end
 
 -- spec_mode steps IN_EYE -> CHASE -> (POI) -> ROAMING -> IN_EYE, and
 -- CTFPlayer::SetObserverMode turns ROAMING into IN_EYE for team players.
 local NEXT = { fixed = "in_eye", in_eye = "chase", chase = "roaming", roaming = "in_eye" }
-function S.NextMode(mode, isSpectator)
+function NextMode(mode, isSpectator)
 	local nextMode = NEXT[mode]
 	if nextMode == "roaming" and not isSpectator then return "in_eye" end
 	return nextMode
@@ -62,7 +62,7 @@ end
 -- (C_BasePlayer::CalcChaseCamView treats a model-less target so); only
 -- players can be watched in-eye (CTFPlayer::ValidateCurrentObserverTarget);
 -- without a target the view holds still (ValidateCurrentObserverTarget, TF_DLL).
-function S.ViewMode(mode, kind)
+function ViewMode(mode, kind)
 	if mode == "roaming" then return "roaming" end
 	if kind == "point" or kind == nil then return "fixed" end
 	if kind == "entity" and mode ~= "chase" then return "chase" end
@@ -72,24 +72,24 @@ end
 -- CObserverPoint::CanUseObserverPoint (without the mini-round check).
 local function CanUsePoint(viewer, point, rules)
 	if not point.enabled then return false end
-	if point.associatedTeam and rules.forcecamera == S.FORCE_TEAM and not rules.teamWin
-		and point.associatedTeam ~= viewer.team and viewer.team >= S.FIRST_GAME_TEAM then
+	if point.associatedTeam and rules.forcecamera == FORCE_TEAM and not rules.teamWin
+		and point.associatedTeam ~= viewer.team and viewer.team >= FIRST_GAME_TEAM then
 		return false
 	end
 	return true
 end
 
 local function ForceCameraAllows(viewer, targetTeam, rules)
-	if rules.forcecamera == S.FORCE_TEAM then return targetTeam == viewer.team end
-	return rules.forcecamera == S.FORCE_ALL
+	if rules.forcecamera == FORCE_TEAM then return targetTeam == viewer.team end
+	return rules.forcecamera == FORCE_ALL
 end
 
 -- CTFPlayer::IsValidObserverTarget, non-player branch.
 local function ValidEntity(viewer, target, rules)
 	if target.kind == "point" and not CanUsePoint(viewer, target, rules) then return false end
 	if target.train and rules.teamWin then return false end
-	if viewer.team == S.TEAM_SPECTATOR then return true end
-	if target.team == 0 and rules.forcecamera ~= S.FORCE_NONE then return true end
+	if viewer.team == TEAM_SPECTATOR then return true end
+	if target.team == 0 and rules.forcecamera ~= FORCE_NONE then return true end
 	return ForceCameraAllows(viewer, target.team, rules)
 end
 
@@ -98,11 +98,11 @@ local function ValidPlayer(viewer, target, rules)
 	if not target.alive then
 		if not target.deathTime or rules.now > target.deathTime + TIMES.watchDead then return false end
 	end
-	if viewer.team == S.TEAM_SPECTATOR then return true end
+	if viewer.team == TEAM_SPECTATOR then return true end
 	return ForceCameraAllows(viewer, target.team, rules)
 end
 
-function S.IsValidTarget(viewer, target, rules)
+function IsValidTarget(viewer, target, rules)
 	if not target or target.id == viewer.id then return false end
 	if target.kind == "player" then return ValidPlayer(viewer, target, rules) end
 	return ValidEntity(viewer, target, rules)
@@ -110,7 +110,7 @@ end
 
 -- CTFPlayer::FindNextObserverTarget over the observable list. current is the
 -- index of the present target or nil; returns an index or nil.
-function S.FindNext(list, current, reverse, valid)
+function FindNext(list, current, reverse, valid)
 	local n = #list
 	if n == 0 then return nil end
 	local dir = reverse and -1 or 1
@@ -124,7 +124,7 @@ function S.FindNext(list, current, reverse, valid)
 end
 
 -- CTFPlayer::FindNearestObservableTarget, by each candidate's precomputed dist.
-function S.Nearest(list, valid)
+function Nearest(list, valid)
 	local best, bestDist
 	for i, c in ipairs(list) do
 		if valid(c) and (not bestDist or c.dist < bestDist) then
@@ -136,7 +136,7 @@ end
 
 -- CTFPlayer::PickWelcomeObserverPoint: walks the points taking each usable
 -- one, and stops at the first marked defaultwelcome.
-function S.WelcomePoint(points, valid)
+function WelcomePoint(points, valid)
 	local chosen
 	for i, p in ipairs(points) do
 		if valid(p) then chosen = i end
@@ -144,5 +144,3 @@ function S.WelcomePoint(points, valid)
 	end
 	return chosen
 end
-
-return S

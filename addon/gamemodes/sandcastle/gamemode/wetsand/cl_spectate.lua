@@ -1,7 +1,7 @@
 -- The observer's HUD: the killer during the death cameras, then who or what
 -- is being watched and how, with the keys that change it. Also plays TF2's
 -- freezecam sound so it ends as the camera locks on the killer.
-local Spec = include("lib_spectate.lua")
+local Spec = WETSAND.require("foundation.spectate")
 
 surface.CreateFont("TF2Ents.Spectate", { font = "Roboto", size = 26, weight = 800 })
 surface.CreateFont("TF2Ents.SpectateHint", { font = "Roboto", size = 16, weight = 600 })

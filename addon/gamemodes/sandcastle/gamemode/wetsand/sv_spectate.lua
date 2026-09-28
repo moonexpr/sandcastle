@@ -6,9 +6,8 @@
 -- Spectators (team 1) watch anyone, roam freely, or use the map's
 -- info_observer_points. The model of each observer lives in `observing[ply]`;
 -- Apply() makes the engine's observer mode and target match it every tick.
--- The rules themselves are in lib_spectate.lua.
-AddCSLuaFile("lib_spectate.lua") -- cl_spectate.lua reads its freezecam timings
-local Spec = include("lib_spectate.lua")
+-- The rules themselves are in foundation/spectate.lua.
+local Spec = WETSAND.require("foundation.spectate")
 
 local OBS = {
 	fixed = OBS_MODE_FIXED,
@@ -30,7 +29,7 @@ local function IsSpectator(ply)
 	return ply:Team() == WETSAND.TEAM_SPECTATOR
 end
 
--- Descriptors for lib_spectate ------------------------------------------------
+-- Descriptors for foundation.spectate -----------------------------------------
 
 local function Rules()
 	return {

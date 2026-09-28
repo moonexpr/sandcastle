@@ -14,10 +14,6 @@ function T.require(name)
 	return package.loaded[name]
 end
 
-function T.lib(name)
-	return dofile(T.ROOT .. "wetsand/lib_" .. name .. ".lua")
-end
-
 function T.test(name, fn)
 	local ok, err = pcall(fn)
 	if ok then

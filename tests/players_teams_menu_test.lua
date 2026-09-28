@@ -1,5 +1,5 @@
 local T = dofile("tests/harness.lua")
-local L = T.lib("teams")
+local L = T.require("foundation.teams")
 
 local UNASSIGNED, SPEC, RED, BLU = 0, 1, 2, 3
 

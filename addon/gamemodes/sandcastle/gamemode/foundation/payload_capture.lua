@@ -6,11 +6,12 @@
 -- Events: { kind = "start" | "break" | "end" | "capturestart", team },
 -- { kind = "numcappers", n, blocked } (SetNumCappers), { kind = "blocked", value,
 -- capping } (UpdateBlocked), { kind = "owner", old, team } (the area's new owner).
-local C = {}
+local ipairs = ipairs
+module(...)
 
 local TEAMS = { 2, 3 }
 
-function C.New(owner)
+function New(owner)
 	return {
 		owner = owner,
 		capturing = false,
@@ -24,13 +25,13 @@ function C.New(owner)
 end
 
 -- Under mp_capstyle 1 more players cap faster, from a longer base time.
-function C.TotalTime(capTime, scales, numRequired)
+function TotalTime(capTime, scales, numRequired)
 	if scales then return capTime * 2 * numRequired end
 	return capTime
 end
 
 local function Total(s, i)
-	return C.TotalTime(i.capTime, i.scales, i.numRequired[s.cappingTeam])
+	return TotalTime(i.capTime, i.scales, i.numRequired[s.cappingTeam])
 end
 
 -- UpdateNumPlayers: the capping team's count goes to SetNumCappers.
@@ -60,7 +61,7 @@ local function End(s, ev)
 end
 
 -- BreakCapture
-local function Break(s, ev)
+local function BreakInto(s, ev)
 	if not s.capturing then return end
 	ev[#ev + 1] = { kind = "break", team = s.cappingTeam }
 	s.capturing, s.cappingTeam, s.timeRemaining = false, 0, 0
@@ -108,7 +109,7 @@ local function Advance(s, ev, i, teamsInZone)
 	s.lastReduction = i.now
 	if teamsInZone > 1 then
 		SetBlocked(s, ev, true)
-		if i.blockstyle == 0 then Break(s, ev) end
+		if i.blockstyle == 0 then BreakInto(s, ev) end
 		return
 	end
 	SetBlocked(s, ev, false)
@@ -129,7 +130,7 @@ local function Advance(s, ev, i, teamsInZone)
 	if s.timeRemaining <= 0 then
 		End(s, ev)
 	elseif s.timeRemaining >= total then
-		Break(s, ev)
+		BreakInto(s, ev)
 	end
 end
 
@@ -147,10 +148,10 @@ end
 -- CaptureThink. i = { now, pointsMayBeCaptured, counts, canCap, numRequired,
 -- startRequired, capTime, scales (mp_capstyle), blockstyle, deteriorate,
 -- overtime, teamMayCapture(team) }.
-function C.Step(s, i)
+function Step(s, i)
 	local ev = {}
 	if not i.pointsMayBeCaptured then
-		Break(s, ev)
+		BreakInto(s, ev)
 		return ev
 	end
 	local teamsInZone, changed = Survey(s, i.counts)
@@ -176,31 +177,29 @@ function C.Step(s, i)
 end
 
 -- InputCaptureCurrentCP
-function C.CaptureCurrent(s)
+function CaptureCurrent(s)
 	local ev = {}
 	if s.capturing then End(s, ev) end
 	return ev
 end
 
 -- InputSetControlPoint's BreakCapture
-function C.Break(s)
+function Break(s)
 	local ev = {}
-	Break(s, ev)
+	BreakInto(s, ev)
 	return ev
 end
 
 -- The HUD's capture progress, 0 (none) to 1 (captured).
-function C.Progress(s, i)
+function Progress(s, i)
 	if not s.capturing then return 0 end
 	return 1 - s.timeRemaining / Total(s, i)
 end
 
 -- HandleRespawnTimeAdjustments: undo the old owner's team_spawn_N, apply the new one's.
-function C.SpawnAdjustments(old, new, spawnAdjust)
+function SpawnAdjustments(old, new, spawnAdjust)
 	local out = {}
 	if old >= 2 and spawnAdjust[old] ~= 0 then out[#out + 1] = { team = old, seconds = -spawnAdjust[old] } end
 	if new >= 2 and spawnAdjust[new] ~= 0 then out[#out + 1] = { team = new, seconds = spawnAdjust[new] } end
 	return out
 end
-
-return C

@@ -2,7 +2,7 @@
 -- (CTFPlayer::ChangeTeam / ForceChangeTeam), the jointeam command
 -- (HandleCommand_JoinTeam), auto-assignment (GetAutoTeam), and automatic
 -- balancing (CTeamplayRoundBasedRules::BalanceTeams). The rules themselves
--- are in lib_teams.lua.
+-- are in foundation/teams.lua.
 local L = WETSAND.TeamRules
 
 util.AddNetworkString("tf2.team.menu")

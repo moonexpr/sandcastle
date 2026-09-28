@@ -13,18 +13,20 @@ work in parallel, each in its own git worktree and branch; the integrator
 addon/gamemodes/sandcastle/
   sandcastle.txt                 gamemode manifest (base: sandbox)
   gamemode/shared.lua            GM, DeriveGamemode("sandbox"), module loader, CreateTeams, StartCommand
-  gamemode/init.lua              server GM overrides (spawn, death, team default)
+  gamemode/init.lua              server GM overrides (spawn, death, team default); sends foundation/*.lua to clients
   gamemode/cl_init.lua           client GM overrides (HUDPaint -> hook "SandcastleHUDPaint")
   gamemode/wetsand/sh_*.lua      loaded on both realms (sh_core first, then name order)
   gamemode/wetsand/sv_*.lua      loaded on the server, name order
   gamemode/wetsand/cl_*.lua      loaded on clients, name order
-  gamemode/wetsand/lib_*.lua     pure logic, no GMod globals, returns a table; NOT auto-loaded:
-                                 the module that uses it includes it (and AddCSLuaFile's it if clients need it)
+  gamemode/foundation/<x>.lua    pure logic as a plain module(...) (no package.seeall, so no GMod
+                                 globals; standard-library globals captured as locals above the call),
+                                 module name foundation.<x>; NOT auto-loaded: the module that uses it
+                                 loads it with WETSAND.require("foundation.<x>") (sh_core.lua)
   entities/entities/<class>.lua  one file per TF2 entity class
-tests/harness.lua, tests/*_test.lua   LuaJIT tests for lib_*.lua (.devtools/bin/run_lua_tests.sh)
+tests/harness.lua, tests/*_test.lua   LuaJIT tests for foundation/*.lua, loaded with T.require (.devtools/bin/run_lua_tests.sh)
 ```
 
-New modules need no wiring: drop a correctly prefixed file into gamemode/wetsand/.
+New modules need no wiring: drop a correctly prefixed file into gamemode/wetsand/, or a module(...) file into gamemode/foundation/.
 
 ## What the game gives you (facts established in pass 1)
 
@@ -52,10 +54,10 @@ New modules need no wiring: drop a correctly prefixed file into gamemode/wetsand
 
 | Agent | Owns |
 |---|---|
-| **A payload** | entities: team_train_watcher, trigger_capture_area, mapobj_cart_dispenser, dispenser_touch_trigger, NEW tf_logic_multiple_escort; modules: cl_hud.lua, NEW sv_payload*/cl_payload*/lib_payload* |
-| **B rounds** | entities: tf_gamerules, team_round_timer, team_control_point_master, team_control_point_round, game_round_win, NEW game_forcerespawn, NEW tf_logic_holiday; modules: sv_controlpoint.lua, cl_announcer.lua, NEW sv_rounds*/cl_rounds*/lib_rounds* |
-| **C players** | entities: func_regenerate, func_respawnroom, func_respawnroomvisualizer, func_nobuild, wetsand_brush_volume, wetsand_inert_point, wetsand_pickup_base, wetsand_trigger_volume, item_*, filter_activator_tfteam, NEW misc (trigger_stun, trigger_add/remove_tf_player_condition, trigger_catapult if GMod lacks it, func_nogrenades, bot_hint_*/func_nav_*/func_tfbot_hint no-ops, entity_spawn_point/manager, tf_ammo_pack); modules: sv_world.lua, sh_core.lua, gamemode/init.lua, NEW sv_teams*/cl_teams*/lib_teams* |
-| **D spectator** | entities: info_observer_point; modules: NEW sv_spectate*/cl_spectate*/lib_spectate* (hooks only; no GM overrides) |
+| **A payload** | entities: team_train_watcher, trigger_capture_area, mapobj_cart_dispenser, dispenser_touch_trigger, NEW tf_logic_multiple_escort; modules: cl_hud.lua, NEW sv_payload*/cl_payload*/foundation/payload* |
+| **B rounds** | entities: tf_gamerules, team_round_timer, team_control_point_master, team_control_point_round, game_round_win, NEW game_forcerespawn, NEW tf_logic_holiday; modules: sv_controlpoint.lua, cl_announcer.lua, NEW sv_rounds*/cl_rounds*/foundation/rounds* |
+| **C players** | entities: func_regenerate, func_respawnroom, func_respawnroomvisualizer, func_nobuild, wetsand_brush_volume, wetsand_inert_point, wetsand_pickup_base, wetsand_trigger_volume, item_*, filter_activator_tfteam, NEW misc (trigger_stun, trigger_add/remove_tf_player_condition, trigger_catapult if GMod lacks it, func_nogrenades, bot_hint_*/func_nav_*/func_tfbot_hint no-ops, entity_spawn_point/manager, tf_ammo_pack); modules: sv_world.lua, sh_core.lua, gamemode/init.lua, NEW sv_teams*/cl_teams*/foundation/teams* |
+| **D spectator** | entities: info_observer_point; modules: NEW sv_spectate*/cl_spectate*/foundation/spectate* (hooks only; no GM overrides) |
 | integrator | gamemode/shared.lua, gamemode/cl_init.lua, sh_soundscripts.lua, docs/, .devtools/ |
 
 ## Interfaces
@@ -94,7 +96,7 @@ New, each provided by its owner exactly as named (others may call them):
 - Behaviour comes from TF2's code: source-sdk-2013 at `~/Repositories/source-sdk-2013/src/game/` (server/, shared/, shared/tf/, server/tf/, client/tf/). Cite the C++ function a behaviour comes from in a short comment where the reason is not obvious. Keyvalues, inputs and outputs of every entity are in TF2's FGD: `$TF2/bin/tf.fgd` (also queryable via the tf2vscript MCP tool `entity_io`), where `$TF2="$HOME/Library/Application Support/CrossOver/Bottles/Team Fortress 2/drive_c/Steam/steamapps/common/Team Fortress 2"`.
 - Map data: `.devtools/bin/bsp_entities.py $TF2/tf/maps/<map>.bsp [--json | --class C | --io]` dumps any map's entities; use it to see how real maps use an entity before implementing it.
 - TF2's own convar names and defaults (from the SDK) for TF2 settings; `wetsand_*` for Sandcastle-only settings.
-- Code style (from the operator's rules): pure logic goes in `lib_*.lua` with a LuaJIT test written first and seen failing; no defensive fallbacks for states the code rules out; small functions with one job; comments only for constraints the code cannot show. Match the existing files: tabs, `local` helpers, INPUTS tables keyed by lowercased input name, `ENT:KeyValue` storing `On*` via `StoreOutput`.
+- Code style (from the operator's rules): pure logic goes in `foundation/<x>.lua` (a `module(...)` loaded with `WETSAND.require`) with a LuaJIT test written first and seen failing; no defensive fallbacks for states the code rules out; small functions with one job; comments only for constraints the code cannot show. Match the existing files: tabs, `local` helpers, INPUTS tables keyed by lowercased input name, `ENT:KeyValue` storing `On*` via `StoreOutput`.
 - Every Lua file must pass `luajit -b <file> /dev/null`; `.devtools/bin/run_lua_tests.sh` must pass.
 - Do not use the live game (`.devtools/bin/gmod_lua.py`) and do not launch or close Garry's Mod or Steam: the integrator tests in game after merging.
 - Commit in small units on your branch: `git -c gpg.program=gpg-loopback commit -m "..."`. Never add Co-Authored-By or any Claude attribution. Do not push. Messages explain what and why.

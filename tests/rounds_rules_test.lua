@@ -1,8 +1,8 @@
--- lib_rounds: mini-round selection, win checks and limits, as the SDK's
+-- foundation.rounds: mini-round selection, win checks and limits, as the SDK's
 -- CTeamControlPointMaster / CTeamControlPointRound / CTeamplayRoundBasedRules
 -- compute them.
 local T = dofile("tests/harness.lua")
-local R = T.lib("rounds")
+local R = T.require("foundation.rounds")
 
 local function P(owner, group) return { owner = owner, group = group or 0 } end
 

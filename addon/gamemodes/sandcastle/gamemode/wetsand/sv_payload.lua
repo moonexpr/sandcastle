@@ -3,10 +3,9 @@
 -- payload race), publishes every cart and timed capture for the HUD, and
 -- plays the payload race stage-outcome lines.
 
-WETSAND.Payload = include("lib_payload.lua")
-WETSAND.PayloadCapture = include("lib_payload_capture.lua")
-WETSAND.PayloadRace = include("lib_payload_race.lua")
-AddCSLuaFile("lib_payload_race.lua")
+WETSAND.Payload = WETSAND.require("foundation.payload")
+WETSAND.PayloadCapture = WETSAND.require("foundation.payload_capture")
+WETSAND.PayloadRace = WETSAND.require("foundation.payload_race")
 
 local P, R = WETSAND.Payload, WETSAND.PayloadRace
 

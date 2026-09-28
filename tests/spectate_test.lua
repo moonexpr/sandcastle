@@ -1,5 +1,5 @@
 local T = dofile("tests/harness.lua")
-local S = T.lib("spectate")
+local S = T.require("foundation.spectate")
 
 local RED, BLU, SPEC = 2, 3, 1
 local TIMES = S.TIMES

@@ -1,13 +1,14 @@
 -- Team rules of TF2 as pure functions: joining, auto-assignment, balance,
 -- and the team tests of the spawn-room entities. No GMod globals; the
 -- modules that use it include it.
-local L = {}
+local ipairs, math, pairs, string, table = ipairs, math, pairs, string, table
+module(...)
 
 local UNASSIGNED, SPECTATOR, RED, BLUE = 0, 1, 2, 3
-L.AUTO = "auto"
-L.STATE_TEAM_WIN = 5 -- GR_STATE_TEAM_WIN
-L.STATE_STALEMATE = 7 -- GR_STATE_STALEMATE
-L.STATE_GAME_OVER = 8 -- GR_STATE_GAME_OVER
+AUTO = "auto"
+STATE_TEAM_WIN = 5 -- GR_STATE_TEAM_WIN
+STATE_STALEMATE = 7 -- GR_STATE_STALEMATE
+STATE_GAME_OVER = 8 -- GR_STATE_GAME_OVER
 
 -- HandleCommand_JoinTeam: g_aTeamNames, compared case-insensitively. A name
 -- it does not know leaves the command's initial choice, RED. "blu" is
@@ -20,10 +21,10 @@ local JOIN_NAMES = {
 	red = RED,
 	blue = BLUE,
 	blu = BLUE,
-	auto = L.AUTO,
+	auto = AUTO,
 }
 
-function L.ParseJoinTeam(name)
+function ParseJoinTeam(name)
 	local team = JOIN_NAMES[string.lower(name)]
 	if team == nil then return RED end
 	return team
@@ -32,7 +33,7 @@ end
 -- CTFPlayer::GetAutoTeam: the team with fewer players. On an even split TF2
 -- gives attackers the player on escort (payload) maps; Sandcastle does so on
 -- every map, so a lone player lands on BLU and can push the cart.
-function L.AutoTeam(red, blue)
+function AutoTeam(red, blue)
 	if blue < red then return BLUE end
 	if red < blue then return RED end
 	return BLUE
@@ -49,7 +50,7 @@ local function GameTeams(counts)
 end
 
 -- CTeamplayRoundBasedRules::WouldChangeUnbalanceTeams.
-function L.WouldUnbalance(counts, newTeam, currentTeam, limit)
+function WouldUnbalance(counts, newTeam, currentTeam, limit)
 	if newTeam == currentTeam or limit <= 0 or counts[newTeam] == nil then return false end
 	local joined = counts[newTeam] + 1
 	for t, n in pairs(counts) do
@@ -62,7 +63,7 @@ function L.WouldUnbalance(counts, newTeam, currentTeam, limit)
 end
 
 -- CTeamplayRoundBasedRules::AreTeamsUnbalanced: heavy and light team, or nil.
-function L.Unbalanced(counts, limit)
+function Unbalanced(counts, limit)
 	if limit <= 0 then return nil end
 	local heavy, light
 	for _, t in ipairs(GameTeams(counts)) do
@@ -73,14 +74,14 @@ function L.Unbalanced(counts, limit)
 	return nil
 end
 
-function L.SwitchesRequired(heavyCount, lightCount)
+function SwitchesRequired(heavyCount, lightCount)
 	return math.floor((heavyCount - lightCount) / 2)
 end
 
 -- CBaseMultiplayerPlayer::CalculateTeamBalanceScore: higher is switched
 -- first, so the newest players move and anyone moved in the last 5 minutes
 -- is spared.
-function L.BalanceScore(now, connectedAt, lastForcedAt)
+function BalanceScore(now, connectedAt, lastForcedAt)
 	local score = -math.floor(now - connectedAt)
 	if lastForcedAt and now - lastForcedAt < 300 then score = score - 10000 end
 	return score
@@ -89,7 +90,7 @@ end
 -- The selection loop of CTeamplayRoundBasedRules::BalanceTeams: the best
 -- `required` + 2 candidates by score; mid-round only dead ones may move.
 -- candidates: { id, score, alive }. Returns the ids to switch.
-function L.PickBalanceSwitches(candidates, required, requireDead)
+function PickBalanceSwitches(candidates, required, requireDead)
 	local sorted = {}
 	for i, c in ipairs(candidates) do sorted[i] = c end
 	table.sort(sorted, function(a, b) return a.score > b.score end)
@@ -105,9 +106,9 @@ end
 -- CFilterTFTeam::PassesFilterImpl, then CBaseFilter::PassesFilter's
 -- negation: during team win the winners pass every team filter (the impl
 -- answers "no" to a negated filter, which the negation turns into a pass).
-function L.FilterPasses(filterTeam, negated, entTeam, state, winner)
+function FilterPasses(filterTeam, negated, entTeam, state, winner)
 	local impl
-	if state == L.STATE_TEAM_WIN and entTeam == winner then
+	if state == STATE_TEAM_WIN and entTeam == winner then
 		impl = not negated
 	else
 		impl = entTeam == filterTeam
@@ -119,7 +120,7 @@ end
 -- CFuncRespawnRoomVisualizer::ShouldCollide: a RED door stops players whose
 -- movement mask holds CONTENTS_REDTEAM, which is BLU players, and the other
 -- way round; any other non-zero team stops every player.
-function L.VisualizerBlocks(vizTeam, playerTeam)
+function VisualizerBlocks(vizTeam, playerTeam)
 	if vizTeam == UNASSIGNED then return false end
 	if vizTeam == RED then return playerTeam == BLUE end
 	if vizTeam == BLUE then return playerTeam == RED end
@@ -128,7 +129,7 @@ end
 
 -- CFuncRespawnRoomVisualizer::ShouldTransmit: drawn for players of the
 -- other playing team while its room is active and nobody has won.
-function L.VisualizerVisible(vizTeam, roomActive, teamWin, viewerTeam)
+function VisualizerVisible(vizTeam, roomActive, teamWin, viewerTeam)
 	if not roomActive or teamWin or vizTeam == UNASSIGNED then return false end
 	return viewerTeam > SPECTATOR and viewerTeam ~= vizTeam
 end
@@ -136,22 +137,22 @@ end
 -- CRegenerateZone::Touch: a zone with a team serves only that team; during
 -- team win every zone serves the winners and none the losers; nothing
 -- during a stalemate.
-function L.RegenerateAllowed(zoneTeam, playerTeam, state, winner)
-	if state == L.STATE_TEAM_WIN then
+function RegenerateAllowed(zoneTeam, playerTeam, state, winner)
+	if state == STATE_TEAM_WIN then
 		if winner ~= playerTeam then return false end
 	elseif zoneTeam ~= UNASSIGNED and playerTeam ~= zoneTeam then
 		return false
 	end
-	return state ~= L.STATE_STALEMATE
+	return state ~= STATE_STALEMATE
 end
 
 -- The team menu (CTFTeamMenu) --------------------------------------------------
 
 -- CTFTeamMenu::ShowPanel: nobody changes teams once the game is over, nor
 -- does a player of a losing team while the winners celebrate.
-function L.TeamMenuAllowed(state, currentTeam, winner)
-	if state == L.STATE_GAME_OVER then return false end
-	return not (state == L.STATE_TEAM_WIN and currentTeam >= RED and currentTeam ~= winner)
+function TeamMenuAllowed(state, currentTeam, winner)
+	if state == STATE_GAME_OVER then return false end
+	return not (state == STATE_TEAM_WIN and currentTeam >= RED and currentTeam ~= winner)
 end
 
 local TEAM_FULL = "Team is full"
@@ -173,8 +174,8 @@ end
 -- or joining it would unbalance the teams.
 local function TeamChoice(spec, counts, currentTeam, limit)
 	local c = Choice("team", spec, currentTeam)
-	local heavy = L.Unbalanced(counts, limit)
-	if heavy == spec.index or L.WouldUnbalance(counts, spec.index, currentTeam, limit) then
+	local heavy = Unbalanced(counts, limit)
+	if heavy == spec.index or WouldUnbalance(counts, spec.index, currentTeam, limit) then
 		c.enabled, c.reason = false, TEAM_FULL
 	end
 	return c
@@ -186,7 +187,7 @@ end
 -- offered when present. Hotkeys number auto, spectate, then the teams
 -- (Teammenu.res: &1 random, &2 spectate, &3 BLU, &4 RED). Cancel only once
 -- the player has a team (CTFTeamMenu::Update).
-function L.TeamMenu(teams, currentTeam, limit, extras)
+function TeamMenu(teams, currentTeam, limit, extras)
 	local counts = {}
 	for _, t in ipairs(teams) do counts[t.index] = t.count end
 	local menu = { teams = {}, choices = {}, cancel = currentTeam ~= UNASSIGNED }
@@ -200,5 +201,3 @@ function L.TeamMenu(teams, currentTeam, limit, extras)
 	for i, t in ipairs(teams) do menu.teams[i] = Add(TeamChoice(t, counts, currentTeam, limit)) end
 	return menu
 end
-
-return L

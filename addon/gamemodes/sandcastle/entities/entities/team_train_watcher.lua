@@ -5,7 +5,7 @@
 -- with handle_train_movement drives the train itself (speed by pushers,
 -- hills, receding). With handle_train_movement 0 the map moves the train
 -- from the capture area's outputs and the watcher only tracks it.
--- The decisions live in lib_payload.lua (WETSAND.Payload).
+-- The decisions live in foundation/payload.lua (WETSAND.Payload).
 ENT.Type = "point"
 ENT.Base = "base_point"
 

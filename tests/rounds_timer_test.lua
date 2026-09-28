@@ -1,8 +1,8 @@
--- lib_rounds: team_round_timer output arming (CalculateOutputMessages), the
+-- foundation.rounds: team_round_timer output arming (CalculateOutputMessages), the
 -- one-output-per-think chains of RoundTimerThink / RoundTimerSetupThink and
 -- the client's ClientThink, and CTeamRoundTimer::SetActiveTimer.
 local T = dofile("tests/harness.lua")
-local R = T.lib("rounds")
+local R = T.require("foundation.rounds")
 
 T.test("outputs are armed for every mark the time still reaches", function()
 	local armed = R.ArmTimerOutputs(70)

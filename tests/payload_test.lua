@@ -1,6 +1,6 @@
--- lib_payload: the team_train_watcher's decisions (team_train_watcher.cpp).
+-- foundation.payload: the team_train_watcher's decisions (team_train_watcher.cpp).
 local T = dofile("tests/harness.lua")
-local P = T.lib("payload")
+local P = T.require("foundation.payload")
 
 -- HandleTrainMovement -----------------------------------------------------------
 

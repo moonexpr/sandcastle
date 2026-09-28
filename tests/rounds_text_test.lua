@@ -1,7 +1,7 @@
--- lib_rounds: the win panel's wording (CTFWinPanel::FireGameEvent) and the
+-- foundation.rounds: the win panel's wording (CTFWinPanel::FireGameEvent) and the
 -- lookup of TF2 localization tokens in tf_english.txt (UTF-16LE).
 local T = dofile("tests/harness.lua")
-local R = T.lib("rounds")
+local R = T.require("foundation.rounds")
 
 local W = R.WINREASON
 

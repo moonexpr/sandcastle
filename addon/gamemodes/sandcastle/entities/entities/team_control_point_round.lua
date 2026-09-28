@@ -51,7 +51,7 @@ function ENT:HasPoint(point)
 	return false
 end
 
--- Owners and groups, for lib_rounds.
+-- Owners and groups, for foundation.rounds.
 function ENT:PointStates()
 	local states = {}
 	for i, p in ipairs(self:Points()) do

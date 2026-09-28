@@ -1,9 +1,8 @@
 -- Round plumbing shared by tf_gamerules, team_round_timer and the control
--- point entities: the rules from lib_rounds, the HUD timer (what TF2 keeps in
+-- point entities: the rules from foundation.rounds, the HUD timer (what TF2 keeps in
 -- CBaseTeamObjectiveResource::m_iTimerToShowInHUD), setup and overtime flags,
 -- the current mini-round, and the team switch.
-AddCSLuaFile("lib_rounds.lua")
-WETSAND.RoundsLib = include("lib_rounds.lua")
+WETSAND.RoundsLib = WETSAND.require("foundation.rounds")
 
 local L = WETSAND.RoundsLib
 

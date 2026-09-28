@@ -5,7 +5,7 @@
 -- in the HUD speaks, and only while it runs with auto_countdown on. Overtime
 -- is CTFGameRules::HandleOvertimeBegin. Win, loss, stalemate and sudden death
 -- music arrive from the server as tf2.sound.
-WETSAND.RoundsLib = include("lib_rounds.lua")
+WETSAND.RoundsLib = WETSAND.require("foundation.rounds")
 
 local SETUP_SOUND = {
 	[60] = "Announcer.RoundBegins60Seconds", [30] = "Announcer.RoundBegins30Seconds",

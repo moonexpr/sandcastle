@@ -34,14 +34,10 @@ WETSAND.STATE = {
 	BETWEEN_RNDS = 10,
 }
 
--- Pure rule libraries (lib_*.lua), shared so client prediction and drawing
--- follow the same rules as the server.
-if SERVER then
-	AddCSLuaFile("lib_teams.lua")
-	AddCSLuaFile("lib_players.lua")
-end
-WETSAND.TeamRules = include("lib_teams.lua")
-WETSAND.PlayerRules = include("lib_players.lua")
+-- Pure rule libraries (gamemode/foundation/), shared so client prediction and
+-- drawing follow the same rules as the server.
+WETSAND.TeamRules = WETSAND.require("foundation.teams")
+WETSAND.PlayerRules = WETSAND.require("foundation.players")
 
 WETSAND.TeamName = { [0] = "Nobody", [1] = "Spectator", [2] = "RED", [3] = "BLU" }
 WETSAND.TeamColor = {

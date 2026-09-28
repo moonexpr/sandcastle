@@ -1,6 +1,6 @@
 -- trigger_capture_area (CTriggerAreaCapture, trigger_area_capture.cpp): the
 -- volume players stand in to capture its control point. Each think it counts
--- the players inside and steps the capture (lib_payload_capture.lua), then
+-- the players inside and steps the capture (foundation/payload_capture.lua), then
 -- fires the outputs, changes ownership and tells the point and any train
 -- watcher, in the order the SDK does. On payload maps it rides the cart with
 -- a huge area_time_to_cap, so the capture never completes by time: the track

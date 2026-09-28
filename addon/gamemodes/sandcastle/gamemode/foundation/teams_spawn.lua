@@ -4,7 +4,8 @@
 -- without mini-rounds (RecalculateControlPointState), and the round-robin
 -- choice (CTFPlayer::SelectSpawnSpotByType). Pure: spawns are records
 -- { team, disabled, controlpoint, roundBlue, roundRed, spawnMode, matchSummary }.
-local S = {}
+local ipairs, tonumber = ipairs, tonumber
+module(...)
 
 local RED, BLUE = 2, 3
 
@@ -14,7 +15,7 @@ local function Name(value)
 end
 
 -- A record from the keyvalues the map gave the spawn (lowercased keys).
-function S.FromKeyValues(kv)
+function FromKeyValues(kv)
 	return {
 		team = tonumber(kv.teamnum) or 0,
 		disabled = kv.startdisabled == "1",
@@ -29,7 +30,7 @@ end
 -- CTFGameRules::IsSpawnPointValid, outside the match summary: the team's,
 -- enabled, spawn mode Normal (Triggered spawns are only for a respawn
 -- override), and not a podium spot.
-function S.Valid(spawn, team)
+function Valid(spawn, team)
 	return spawn.team == team and not spawn.disabled and spawn.spawnMode == 0 and spawn.matchSummary == 0
 end
 
@@ -38,7 +39,7 @@ end
 -- round_redspawn take that team; every other spawn is switched off.
 -- roundPoints is the set of point names in the round; pointOwner(name) is
 -- the owner of the named point, or nil when there is none.
-function S.SetupForRound(spawns, roundName, roundPoints, pointOwner)
+function SetupForRound(spawns, roundName, roundPoints, pointOwner)
 	for _, s in ipairs(spawns) do
 		local owner = s.controlpoint and pointOwner(s.controlpoint)
 		if owner and roundPoints[s.controlpoint] then
@@ -57,7 +58,7 @@ function S.SetupForRound(spawns, roundName, roundPoints, pointOwner)
 end
 
 -- CTeamControlPointMaster::GetBaseControlPoint. points: { index, defaultOwner }.
-function S.BaseControlPoint(points, team)
+function BaseControlPoint(points, team)
 	local lowest, highest
 	for _, p in ipairs(points) do
 		if not highest or p.index > highest.index then highest = p end
@@ -72,7 +73,7 @@ end
 -- CTFGameRules::SetupOnRoundStart without mini-rounds: every spawn tied to a
 -- control point starts off, and the points that have spawns are noted per
 -- team. pointIndex(name) is the named point's index, or nil.
-function S.StartControlPointSpawns(spawns, pointIndex)
+function StartControlPointSpawns(spawns, pointIndex)
 	local controlSpawns = { [RED] = {}, [BLUE] = {} }
 	for _, s in ipairs(spawns) do
 		local index = s.controlpoint and pointIndex(s.controlpoint)
@@ -85,8 +86,8 @@ function S.StartControlPointSpawns(spawns, pointIndex)
 end
 
 -- CTFGameRules::GetFarthestOwnedControlPoint(team, true). points: { index, owner, defaultOwner }.
-function S.FarthestOwnedPoint(team, points, controlSpawns)
-	local ownedEnd = S.BaseControlPoint(points, team)
+function FarthestOwnedPoint(team, points, controlSpawns)
+	local ownedEnd = BaseControlPoint(points, team)
 	if ownedEnd == -1 then return -1 end
 	local owner = {}
 	for _, p in ipairs(points) do owner[p.index] = p.owner end
@@ -102,9 +103,9 @@ end
 
 -- CTFGameRules::RecalculateControlPointState: each team spawns at the
 -- farthest point it holds that has spawns.
-function S.RecalculateControlPointState(spawns, points, controlSpawns, pointIndex)
+function RecalculateControlPointState(spawns, points, controlSpawns, pointIndex)
 	for _, team in ipairs({ RED, BLUE }) do
-		local farthest = S.FarthestOwnedPoint(team, points, controlSpawns)
+		local farthest = FarthestOwnedPoint(team, points, controlSpawns)
 		if farthest ~= -1 then
 			for _, s in ipairs(spawns) do
 				local index = s.controlpoint and pointIndex(s.controlpoint)
@@ -117,18 +118,16 @@ end
 -- CTFPlayer::SelectSpawnSpotByType: start after the last spot the team
 -- used, take the first valid clear spot, else the first valid one.
 -- isClear(i) says whether spot i is free of players. Returns an index or nil.
-function S.Pick(spawns, team, last, isClear)
+function Pick(spawns, team, last, isClear)
 	local n = #spawns
 	local start = last or 0
 	local fallback
 	for step = 1, n do
 		local i = (start + step - 1) % n + 1
-		if S.Valid(spawns[i], team) then
+		if Valid(spawns[i], team) then
 			if isClear(i) then return i end
 			fallback = fallback or i
 		end
 	end
 	return fallback
 end
-
-return S
