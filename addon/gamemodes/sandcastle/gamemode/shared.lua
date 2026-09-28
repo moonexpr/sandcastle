@@ -22,9 +22,10 @@ for _, f in ipairs(GM:TF2Modules("sh_")) do
 	if f ~= "sh_core.lua" then include("tf2/" .. f) end
 end
 
--- TF2's team numbers; GMod reserves only 0, 1001 and 1002.
+-- TF2's team numbers (1 spectator, 2 RED, 3 BLU); GMod reserves only 0, 1001 and 1002.
 function GM:CreateTeams()
 	self.BaseClass.CreateTeams(self)
+	team.SetUp(TF2.TEAM_SPECTATOR, "Spectator", Color(200, 200, 200), true)
 	team.SetUp(TF2.TEAM_RED, "RED", TF2.TeamColor[TF2.TEAM_RED], false)
 	team.SetUp(TF2.TEAM_BLUE, "BLU", TF2.TeamColor[TF2.TEAM_BLUE], false)
 end
