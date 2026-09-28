@@ -1,7 +1,8 @@
--- func_respawnroomvisualizer: the forcefield over a spawn room's doors. It
--- takes its func_respawnroom's team and active state, blocks and shows itself
--- only to that team's enemies, and opens for everyone once a round is won
--- (C_FuncRespawnRoomVisualizer::ShouldCollide).
+-- func_respawnroomvisualizer (CFuncRespawnRoomVisualizer): the forcefield
+-- over a spawn room's doors. At round start it takes its func_respawnroom's
+-- team; the room's SetActive switches it on and off. It stops the enemies of
+-- its team, shows itself only to them while its room is active, and opens
+-- for everyone during team win.
 -- It is an "anim" entity rather than "brush" so clients can draw it.
 AddCSLuaFile()
 
@@ -13,25 +14,70 @@ function ENT:SetupDataTables()
 	self:NetworkVar("Int", 0, "RoomTeam")
 	self:NetworkVar("Bool", 0, "RoomActive")
 	self:NetworkVar("Bool", 1, "Enabled")
-	self:NetworkVar("Bool", 2, "SolidToEnemies")
+	-- CFuncRespawnRoomVisualizer::SetActive: solid, or a trigger that stops nobody.
+	self:NetworkVar("Bool", 2, "FieldOn")
+end
+
+-- GMod caches ShouldCollide answers per pair until CollisionRulesChanged is
+-- called, so the answer is computed from cached values that change only
+-- together with that call (see the tf2.visualizers Think hook below).
+local visualizers = setmetatable({}, { __mode = "k" })
+
+-- The team this forcefield stops the enemies of, or 0 when it stops nobody.
+function ENT:CollisionTeam()
+	if not (self:GetEnabled() and self:GetFieldOn()) then return 0 end
+	if TF2.State() == TF2.STATE.TEAM_WIN then return 0 end
+	return self:GetRoomTeam()
+end
+
+function ENT:RefreshCollision()
+	local team = self:CollisionTeam()
+	if team == self.collisionTeam then return end
+	self.collisionTeam = team
+	self:CollisionRulesChanged()
 end
 
 function ENT:Blocks(ent)
-	if not (IsValid(ent) and ent:IsPlayer()) then return false end
-	if not (self:GetEnabled() and self:GetRoomActive() and self:GetSolidToEnemies()) then return false end
-	if TF2.Active() and TF2.State() == TF2.STATE.TEAM_WIN then return false end
-	local team = self:GetRoomTeam()
-	return team ~= TF2.TEAM_UNASSIGNED and TF2.TeamOf(ent) ~= team
+	if not ent:IsPlayer() then return false end
+	return TF2.TeamRules.VisualizerBlocks(self.collisionTeam, ent.tf2CollisionTeam or ent:Team())
+end
+
+function ENT:InitCollision()
+	self.collisionTeam = self:CollisionTeam()
+	visualizers[self] = true
+	self:SetCustomCollisionCheck(true)
 end
 
 hook.Add("ShouldCollide", "tf2.respawnroomvisualizer", function(a, b)
-	if a:GetClass() == "func_respawnroomvisualizer" then return a:Blocks(b) end
-	if b:GetClass() == "func_respawnroomvisualizer" then return b:Blocks(a) end
+	if visualizers[a] then return a:Blocks(b) end
+	if visualizers[b] then return b:Blocks(a) end
+end)
+
+-- Both realms, every tick: pick up round-state changes (team win opens the
+-- doors) and player team changes, and declare them to the physics engine.
+hook.Add("Think", "tf2.visualizers", function()
+	for viz in pairs(visualizers) do
+		if IsValid(viz) then viz:RefreshCollision() end
+	end
+	for _, ply in ipairs(player.GetAll()) do
+		local team = ply:Team()
+		if ply.tf2CollisionTeam ~= team then
+			ply.tf2CollisionTeam = team
+			ply:CollisionRulesChanged()
+		end
+	end
 end)
 
 if CLIENT then
+	function ENT:Initialize()
+		self:InitCollision()
+	end
+
 	function ENT:Draw()
-		if self:Blocks(LocalPlayer()) then self:DrawModel() end
+		local teamWin = TF2.State() == TF2.STATE.TEAM_WIN
+		if self:GetEnabled() and TF2.TeamRules.VisualizerVisible(self:GetRoomTeam(), self:GetRoomActive(), teamWin, LocalPlayer():Team()) then
+			self:DrawModel()
+		end
 	end
 	ENT.DrawTranslucent = ENT.Draw
 	return
@@ -47,6 +93,8 @@ function ENT:KeyValue(key, value)
 		self.solidToEnemies = value ~= "0"
 	elseif k == "startdisabled" then
 		self.startDisabled = value == "1"
+	elseif k == "teamnum" then
+		self.keyTeam = tonumber(value) or 0
 	elseif string.sub(key, 1, 2) == "On" then
 		self:StoreOutput(key, value)
 	end
@@ -56,40 +104,52 @@ function ENT:Initialize()
 	if self.brushModel then self:SetModel(self.brushModel) end
 	self:SetMoveType(MOVETYPE_NONE)
 	self:SetSolid(SOLID_BSP)
-	self:SetCustomCollisionCheck(true)
+	if self.solidToEnemies == nil then self.solidToEnemies = true end
 	self:SetEnabled(not self.startDisabled)
-	self:SetSolidToEnemies(self.solidToEnemies ~= false)
+	self:SetRoomTeam(self.keyTeam or 0)
 	self:SetRoomActive(true)
-	self:SyncRoom()
+	self:SetFieldOn(true)
+	self:InitCollision()
 end
 
--- The room decides team and activity; mirror it for clients and collisions.
-function ENT:SyncRoom()
+-- Pushed by the room (CFuncRespawnRoom::SetActive / ChangeTeam).
+function ENT:SetActive(active)
+	self:SetFieldOn(active)
+	self:SetRoomActive(active)
+	self:RefreshCollision()
+end
+
+function ENT:ChangeTeam(team)
+	self:SetRoomTeam(team)
+	self:RefreshCollision()
+end
+
+-- CFuncRespawnRoomVisualizer::InputRoundActivate
+function ENT:RoundActivate()
 	local room = TF2.FindByName(self.roomName)
-	if IsValid(room) and room.team then
+	if IsValid(room) and room:GetClass() == "func_respawnroom" then
+		room:AddVisualizer(self)
 		self:SetRoomTeam(room.team)
-		self:SetRoomActive(room:IsActive())
+		self:SetRoomActive(room.active)
 	end
+	self:SetFieldOn(self.solidToEnemies)
+	self:RefreshCollision()
 end
 
-function ENT:Think()
-	self:SyncRoom()
-	self:NextThink(CurTime() + 0.2)
-	return true
-end
+local INPUTS = {
+	enable = function(self) self:SetEnabled(true) end,
+	disable = function(self) self:SetEnabled(false) end,
+	setsolid = function(self, value)
+		self.solidToEnemies = tostring(value) ~= "0" and tostring(value) ~= "false"
+		self:SetFieldOn(self.solidToEnemies)
+	end,
+	roundactivate = function(self) self:RoundActivate() end,
+}
 
 function ENT:AcceptInput(name, activator, caller, value)
-	local input = string.lower(name)
-	if input == "enable" then
-		self:SetEnabled(true)
-	elseif input == "disable" then
-		self:SetEnabled(false)
-	elseif input == "setsolid" then
-		self:SetSolidToEnemies(tostring(value) ~= "0" and tostring(value) ~= "false")
-	elseif input == "roundactivate" then
-		self:SyncRoom()
-	else
-		return false
-	end
+	local handler = INPUTS[string.lower(name)]
+	if not handler then return false end
+	handler(self, value)
+	self:RefreshCollision()
 	return true
 end

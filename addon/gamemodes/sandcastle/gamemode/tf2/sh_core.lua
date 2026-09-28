@@ -22,7 +22,16 @@ TF2.STATE = {
 	BETWEEN_RNDS = 10,
 }
 
-TF2.TeamName = { [0] = "Nobody", [2] = "RED", [3] = "BLU" }
+-- Pure rule libraries (lib_*.lua), shared so client prediction and drawing
+-- follow the same rules as the server.
+if SERVER then
+	AddCSLuaFile("lib_teams.lua")
+	AddCSLuaFile("lib_players.lua")
+end
+TF2.TeamRules = include("lib_teams.lua")
+TF2.PlayerRules = include("lib_players.lua")
+
+TF2.TeamName = { [0] = "Nobody", [1] = "Spectator", [2] = "RED", [3] = "BLU" }
 TF2.TeamColor = {
 	[0] = Color(220, 220, 220),
 	[2] = Color(189, 59, 59),
