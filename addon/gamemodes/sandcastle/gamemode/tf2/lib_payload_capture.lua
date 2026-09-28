@@ -4,8 +4,8 @@
 -- turns the events into outputs, ownership changes and callbacks.
 --
 -- Events: { kind = "start" | "break" | "end" | "capturestart", team },
--- { kind = "numcappers", n, blocked } (SetNumCappers), { kind = "blocked", value }
--- (UpdateBlocked), { kind = "owner", old, team } (the area's new owner).
+-- { kind = "numcappers", n, blocked } (SetNumCappers), { kind = "blocked", value,
+-- capping } (UpdateBlocked), { kind = "owner", old, team } (the area's new owner).
 local C = {}
 
 local TEAMS = { 2, 3 }
@@ -70,7 +70,7 @@ end
 local function SetBlocked(s, ev, value)
 	if s.blocked == value then return end
 	s.blocked = value
-	ev[#ev + 1] = { kind = "blocked", value = value }
+	ev[#ev + 1] = { kind = "blocked", value = value, capping = s.cappingTeam }
 end
 
 -- Record the counts; returns teams in the zone and whether any count changed.

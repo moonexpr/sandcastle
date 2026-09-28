@@ -197,6 +197,15 @@ T.test("a train that cannot recede loops 18s, then plays a single every 8s", fun
 	T.eq(Actions(P.AlarmStep(a, 250, true, false, true, 50)), "")
 end)
 
+T.test("StopAlarm stops a playing loop and pending singles, and is quiet otherwise", function()
+	local a = P.NewAlarm()
+	T.eq(Actions(P.StopAlarm(a)), "")
+	P.AlarmStep(a, 150, true, true, true, 0)
+	T.eq(Actions(P.StopAlarm(a)), "stop")
+	T.eq(a.playing, false)
+	T.eq(a.played, true)
+end)
+
 -- Hill data for the HUD (WatcherActivate) --------------------------------------------
 
 local function Nodes(spec)

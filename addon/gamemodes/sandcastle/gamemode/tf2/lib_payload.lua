@@ -124,6 +124,13 @@ local function StopAlarm(a, out)
 	a.playing, a.endAt, a.nextSingle = false, -1, nil
 end
 
+-- StopCaptureAlarm on its own (RoundActivate, Enable, Disable); returns the actions.
+function P.StopAlarm(a)
+	local out = {}
+	StopAlarm(a, out)
+	return out
+end
+
 -- One WatcherThink (and WatcherAlarmThink) step.
 function P.AlarmStep(a, distanceToGoal, running, canRecede, hasLinks, now)
 	local out = {}

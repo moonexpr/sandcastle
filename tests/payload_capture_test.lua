@@ -117,6 +117,14 @@ T.test("mp_blockstyle 1: defenders pause the capture and zero the count, -1 for 
 	T.eq(s.capturing, true)
 end)
 
+T.test("a block names the team whose capture it stops", function()
+	local s = C.New(RED)
+	C.Step(s, Input(0, 0, 1, { blockstyle = 0 }))
+	local events = C.Step(s, Input(1, 1, 1, { blockstyle = 0 }))
+	T.eq(events[2].kind, "blocked")
+	T.eq(events[2].capping, BLU)
+end)
+
 T.test("a block is reported again every think while it lasts", function()
 	local s = C.New(RED)
 	C.Step(s, Input(0, 0, 1))
