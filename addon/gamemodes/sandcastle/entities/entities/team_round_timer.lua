@@ -1,16 +1,11 @@
--- team_round_timer: the round clock, with an optional setup phase first.
--- Under tf_gamerules it starts when the round goes active; without one it
--- starts at spawn unless start_paused is set.
+-- team_round_timer: the round clock, with an optional setup phase first
+-- (CTeamRoundTimer, teamplay_round_timer.cpp). A map may have several; the
+-- one shown in the HUD (TF2.HudTimer) publishes the tf2.timer.* keys, speaks
+-- the countdown on clients, and puts the round into overtime.
 ENT.Type = "point"
 ENT.Base = "base_point"
 
--- Outputs fired as the normal (non-setup) time crosses each mark.
-local REMAIN_OUTPUTS = {
-	{ 300, "On5MinRemain" }, { 240, "On4MinRemain" }, { 180, "On3MinRemain" },
-	{ 120, "On2MinRemain" }, { 60, "On1MinRemain" }, { 30, "On30SecRemain" },
-	{ 10, "On10SecRemain" }, { 5, "On5SecRemain" }, { 4, "On4SecRemain" },
-	{ 3, "On3SecRemain" }, { 2, "On2SecRemain" }, { 1, "On1SecRemain" },
-}
+local STATE_SETUP, STATE_NORMAL = "setup", "normal"
 
 local INT_KEYS = {
 	timer_length = "timerLength",
@@ -33,6 +28,8 @@ function ENT:KeyValue(key, value)
 	end
 end
 
+-- CTeamRoundTimer::Spawn: paused, holding the setup time (or the round time
+-- when there is no setup). A disabled timer still takes its time first.
 function ENT:Initialize()
 	self.timerLength = self.timerLength or 600
 	self.maxLength = self.maxLength or 0
@@ -40,117 +37,172 @@ function ENT:Initialize()
 	self.startPaused = self.startPaused or 1
 	self.showInHud = self.showInHud or 1
 	self.autoCountdown = self.autoCountdown or 1
-	self.enabled = self.startDisabled ~= 1
+	self.resetTime = self.resetTime or 0
+	self.serial = 0
+	self.disabled = false
 	self.paused = true
-	self.inSetup = false
-	self.finished = false
-	self.remaining = self.timerLength
-	self:Publish()
-	if TF2.Active() then
-		hook.Add("TF2RoundActive", self, self.RoundStart)
-	elseif self.startPaused == 0 then
-		timer.Simple(0, function() if IsValid(self) then self:RoundStart() end end)
+	self.remaining = 0
+	self.endTime = CurTime()
+	local length = self.timerLength
+	if self.setupLength > 0 then
+		length = self.setupLength
+		self:SetState(STATE_SETUP, true)
+	else
+		self:SetState(STATE_NORMAL, true)
 	end
+	self.timeAfterSetup = self.timerLength
+	self:SetTimeRemaining(length)
+	self.disabled = self.startDisabled == 1
+end
+
+function ENT:OnRemove()
+	if TF2.IsHudTimer(self) then TF2.SetActiveTimer(nil) end
 end
 
 function ENT:UpdateTransmitState()
 	return TRANSMIT_NEVER
 end
 
-function ENT:TimeRemaining()
-	if self.paused then return self.remaining end
-	return math.max(0, self.endTime - CurTime())
-end
+-- Time -------------------------------------------------------------------------------
 
--- Every change to the timer's length bumps a serial, which is how clients know
--- to re-arm their countdown announcements (CalculateOutputMessages).
-function ENT:SetRemaining(seconds)
-	self.remaining = seconds
-	self.endTime = CurTime() + seconds
-	self.serial = (self.serial or 0) + 1
-	self:Publish()
+function ENT:TimeRemaining()
+	local left = self.paused and self.remaining or self.endTime - CurTime()
+	return math.max(0, left)
 end
 
 function ENT:Publish()
-	if self.showInHud ~= 1 then return end
-	SetGlobal2Bool("tf2.timer.show", self.enabled)
+	if not TF2.IsHudTimer(self) then return end
+	SetGlobal2Bool("tf2.timer.show", true)
 	SetGlobal2Bool("tf2.timer.paused", self.paused)
 	SetGlobal2Float("tf2.timer.left", self:TimeRemaining())
 	SetGlobal2Float("tf2.timer.end", CurTime() + self:TimeRemaining())
-	SetGlobal2Bool("tf2.timer.setup", self.inSetup)
+	SetGlobal2Bool("tf2.timer.setup", self.state == STATE_SETUP)
 	SetGlobal2Bool("tf2.timer.autocountdown", self.autoCountdown ~= 0)
-	SetGlobal2Int("tf2.timer.serial", self.serial or 0)
+	SetGlobal2Int("tf2.timer.serial", self.serial)
 end
 
-function ENT:RoundStart()
-	self.finished = false
-	self.lastRemaining = nil
+-- Every change to the timer's length bumps the serial, which is how clients
+-- re-arm their countdown (the client's CalculateOutputMessages on a length change).
+function ENT:LengthChanged()
+	self.armed = TF2.RoundsLib.ArmTimerOutputs(self:TimeRemaining())
+	self.serial = self.serial + 1
+	self:Publish()
+end
+
+-- CTeamRoundTimer::SetTimeRemaining
+function ENT:SetTimeRemaining(seconds)
+	if self.disabled then return end
+	if self.maxLength > 0 then seconds = math.min(seconds, self.maxLength) end
+	self.remaining = seconds
+	self.endTime = CurTime() + seconds
+	self:LengthChanged()
+end
+
+function ENT:Pause()
+	if self.disabled then return end
+	if not self.paused then
+		self.paused = true
+		self.remaining = self.endTime - CurTime()
+	end
+	self:Publish()
+end
+
+function ENT:Resume()
+	if self.disabled then return end
+	if self.paused then
+		self.paused = false
+		self.endTime = CurTime() + self.remaining
+	end
+	self:Publish()
+end
+
+-- CTeamRoundTimer::SetState: every timer tells the gamerules whether it is in setup.
+function ENT:SetState(state, fireOutput)
+	self.state = state
+	TF2.SetSetup(state == STATE_SETUP)
+	if fireOutput then
+		self:TriggerOutput(state == STATE_SETUP and "OnSetupStart" or "OnRoundStart", self)
+	end
+	self:Publish()
+end
+
+-- CTeamRoundTimer::InputRoundSpawn, sent at every round start (full or mini).
+function ENT:RoundSpawn()
+	self.timeAfterSetup = TF2.RoundsLib.TimeAfterSetup(self.resetTime == 1, self.state == STATE_NORMAL,
+		self:TimeRemaining(), self.timerLength)
 	if self.setupLength > 0 then
-		self.inSetup = true
-		if IsValid(TF2.Rules) then TF2.Rules:SetInSetup(true) end
-		self.paused = self.startPaused == 1
-		self:SetRemaining(self.setupLength)
-		self:TriggerOutput("OnSetupStart", self)
+		self:SetState(STATE_SETUP, true)
+		self:SetTimeRemaining(self.setupLength)
 	else
-		self.paused = self.startPaused == 1
-		self:SetRemaining(self.timerLength)
-		self:TriggerOutput("OnRoundStart", self)
+		self:SetState(STATE_NORMAL, true)
+		self:SetTimeRemaining(self.timeAfterSetup)
+	end
+	if self.startPaused == 0 then self:Resume() end
+end
+
+-- Thinking -----------------------------------------------------------------------------
+
+local function RoundWon()
+	return TF2.Active() and TF2.State() == TF2.STATE.TEAM_WIN
+end
+
+function ENT:FireMark(mark)
+	self.armed[mark] = false
+	self:TriggerOutput(TF2.RoundsLib.TimerOutputName(mark), self)
+end
+
+-- RoundTimerSetupThink
+function ENT:SetupThink()
+	TF2.SetOvertime(false)
+	local left = self:TimeRemaining()
+	local next = TF2.RoundsLib.NextTimerOutput(self.armed, left, true)
+	if next == "finished" then
+		self.armed.finished = false
+		self:TriggerOutput("OnSetupFinished", self)
+		self:SetState(STATE_NORMAL, true)
+		self:SetTimeRemaining(self.timeAfterSetup)
+	elseif next then
+		self:FireMark(next)
 	end
 end
 
-function ENT:EndSetup()
-	self.inSetup = false
-	if IsValid(TF2.Rules) then TF2.Rules:SetInSetup(false) end
-	self:SetRemaining(self.timerLength)
-	self.lastRemaining = nil
-	self:TriggerOutput("OnSetupFinished", self)
-	self:TriggerOutput("OnRoundStart", self)
-end
-
--- A payload cart with pushers on it holds the clock at zero (overtime).
-local function TimerMayExpire()
-	for _, watcher in ipairs(ents.FindByClass("team_train_watcher")) do
-		if not watcher:TimerMayExpire() then return false end
+-- RoundTimerThink: at zero the clock holds while a cart is being pushed
+-- (overtime, announced by the HUD timer), then fires OnFinished.
+function ENT:NormalThink()
+	if RoundWon() then
+		self:Pause()
+		return
 	end
-	return true
+	local left = self:TimeRemaining()
+	local hud = TF2.IsHudTimer(self)
+	if left > 0 and hud then TF2.SetOvertime(false) end
+	local next = TF2.RoundsLib.NextTimerOutput(self.armed, left, false)
+	if next == "finished" then
+		if not TF2.TimerMayExpire() then
+			self.endTime = CurTime()
+			if hud then
+				if TF2.InOvertime() then TF2.OvertimeNag() else TF2.SetOvertime(true) end
+			end
+			return
+		end
+		self.armed.finished = false
+		self:TriggerOutput("OnFinished", self)
+	elseif next then
+		self:FireMark(next)
+	end
 end
 
 function ENT:Think()
-	self:NextThink(CurTime() + 0.1)
-	if self.paused or not self.enabled or self.finished then return true end
-
-	local left = self:TimeRemaining()
-	if not self.inSetup then
-		local before = self.lastRemaining or math.huge
-		for _, mark in ipairs(REMAIN_OUTPUTS) do
-			if before > mark[1] and left <= mark[1] then
-				self:TriggerOutput(mark[2], self)
-			end
-		end
-		self.lastRemaining = left
-	end
-
-	if left <= 0 then
-		if self.inSetup then
-			self:EndSetup()
-		elseif not TimerMayExpire() then
-			SetGlobal2Bool("tf2.overtime", true)
-		else
-			SetGlobal2Bool("tf2.overtime", false)
-			self.finished = true
-			self.paused = true
-			self.remaining = 0
-			self:Publish()
-			self:TriggerOutput("OnFinished", self)
-		end
-	end
+	self:NextThink(CurTime() + 0.05)
+	if self.disabled or self.paused then return true end
+	if self.state == STATE_SETUP then self:SetupThink() else self:NormalThink() end
 	return true
 end
 
--- The announcer credits the team the time was added for (AddTeamTime), and
--- says nothing once the round is decided (CTeamRoundTimer::AddTimerSeconds).
+-- Adding time ----------------------------------------------------------------------------
+
+-- The announcer credits the team the time was added for (AddTeamTime).
 local function AnnounceTimeAdded(team)
-	if IsValid(TF2.Rules) and (TF2.Rules:StateGet() == TF2.STATE.TEAM_WIN or TF2.Rules:StateGet() == TF2.STATE.STALEMATE) then return end
 	if team == TF2.TEAM_RED or team == TF2.TEAM_BLUE then
 		TF2.BroadcastSound(team, "Announcer.TimeAwardedForTeam")
 		TF2.BroadcastSound(TF2.EnemyOf(team), "Announcer.TimeAddedForEnemy")
@@ -159,42 +211,83 @@ local function AnnounceTimeAdded(team)
 	end
 end
 
-function ENT:AddTime(seconds, team)
-	local left = self:TimeRemaining() + seconds
-	if self.maxLength > 0 and not self.inSetup then
-		left = math.min(left, self.maxLength)
+-- CTeamRoundTimer::AddTimerSeconds: only while the round runs (or has just
+-- been won); only the HUD timer speaks, and not once the round is decided.
+function ENT:AddTimerSeconds(seconds, team)
+	if self.disabled then return end
+	if TF2.Active() then
+		local state = TF2.State()
+		if state ~= TF2.STATE.RND_RUNNING and state ~= TF2.STATE.TEAM_WIN then return end
 	end
-	if self.paused then self.remaining = left end
-	self:SetRemaining(left)
-	if seconds > 0 and self.showInHud == 1 then
-		TF2.Announce(string.format("+%d:%02d", math.floor(seconds / 60), seconds % 60), 0)
+	seconds = TF2.RoundsLib.ClampAdd(self:TimeRemaining(), seconds, self.maxLength)
+	if self.paused then
+		self.remaining = self.remaining + seconds
+	else
+		self.endTime = self.endTime + seconds
+	end
+	self:LengthChanged()
+	if TF2.IsHudTimer(self) and not RoundWon() then
 		AnnounceTimeAdded(team)
+		if seconds > 0 then
+			TF2.Announce(string.format("+%d:%02d", math.floor(seconds / 60), seconds % 60), 0)
+		end
+	end
+end
+
+-- Inputs -------------------------------------------------------------------------------------
+
+function ENT:Enable()
+	self.disabled = false
+	self:Resume()
+	if self.showInHud == 1 then TF2.SetActiveTimer(self) end
+end
+
+function ENT:Disable()
+	self:Pause()
+	self.disabled = true
+	if self.showInHud == 1 then TF2.SetActiveTimer(nil) end
+end
+
+-- CTeamRoundTimer::InputShowInHUD; the flag is cleared before a replacement is
+-- chosen, so a hidden timer never chooses itself.
+function ENT:ShowInHUD(show)
+	if self.showInHud == 1 and show == 0 then
+		self.showInHud = 0
+		TF2.SetActiveTimer(nil)
+	elseif show == 1 then
+		self.showInHud = 1
+		TF2.SetActiveTimer(self)
+		self:SetState(self.state, false)
+	else
+		self.showInHud = show
 	end
 end
 
 local INPUTS = {
+	pause = function(self) self:Pause() end,
+	resume = function(self) self:Resume() end,
+	settime = function(self, value) self:SetTimeRemaining(tonumber(value) or 0) end,
+	setmaxtime = function(self, value)
+		self.maxLength = tonumber(value) or 0
+		if self.maxLength > 0 and self:TimeRemaining() > self.maxLength then self:SetTimeRemaining(self.maxLength) end
+	end,
+	addtime = function(self, value) self:AddTimerSeconds(tonumber(value) or 0) end,
 	addteamtime = function(self, value)
-		local team, seconds = string.match(tostring(value), "(%d+)%s+(%-?%d+)")
-		self:AddTime(tonumber(seconds) or 0, tonumber(team))
+		local team, seconds = string.match(tostring(value), "^%s*(%-?%d+)%s+(%-?%d+)")
+		seconds = tonumber(seconds) or 0
+		if seconds ~= 0 then self:AddTimerSeconds(seconds, tonumber(team)) end
 	end,
-	addtime = function(self, value) self:AddTime(tonumber(value) or 0) end,
-	settime = function(self, value) self:SetRemaining(tonumber(value) or 0) end,
-	setmaxtime = function(self, value) self.maxLength = tonumber(value) or 0 end,
-	setsetuptime = function(self, value) self.setupLength = tonumber(value) or 0 end,
-	pause = function(self)
-		self.remaining = self:TimeRemaining()
-		self.paused = true
-		self:Publish()
+	restart = function(self) self:SetTimeRemaining(self.timerLength) end,
+	enable = function(self) self:Enable() end,
+	disable = function(self) self:Disable() end,
+	showinhud = function(self, value) self:ShowInHUD(tonumber(value) or 0) end,
+	autocountdown = function(self, value) self.autoCountdown = tonumber(value) == 1 and 1 or 0 self:Publish() end,
+	setsetuptime = function(self, value)
+		local seconds = tonumber(value) or 0
+		if seconds >= 0 then self.setupLength = seconds end
+		if not self.disabled and self.state == STATE_SETUP then self:SetTimeRemaining(self.setupLength) end
 	end,
-	resume = function(self)
-		self.paused = false
-		self:SetRemaining(self.remaining)
-	end,
-	restart = function(self) self:RoundStart() end,
-	enable = function(self) self.enabled = true self:Publish() end,
-	disable = function(self) self.enabled = false self:Publish() end,
-	showinhud = function(self, value) self.showInHud = tonumber(value) or 0 self:Publish() end,
-	autocountdown = function(self, value) self.autoCountdown = tonumber(value) or 0 self:Publish() end,
+	roundspawn = function(self) self:RoundSpawn() end,
 }
 
 function ENT:AcceptInput(name, activator, caller, value)
@@ -202,4 +295,9 @@ function ENT:AcceptInput(name, activator, caller, value)
 	if not handler then return false end
 	handler(self, value)
 	return true
+end
+
+-- The same inputs for Lua callers (the gamerules' stalemate and time limit timers).
+function ENT:DoInput(name, value)
+	INPUTS[string.lower(name)](self, value)
 end

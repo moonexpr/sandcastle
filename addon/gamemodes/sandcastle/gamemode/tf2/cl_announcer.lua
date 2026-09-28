@@ -1,21 +1,11 @@
--- The round timer's announcer, as CTeamRoundTimer plays it on each client
--- (teamplay_round_timer.cpp): "Mission begins in 60 seconds" ... "1" through
--- setup, "Mission ends in ..." through normal time, and the siren when setup
--- gives way to the round. Only the timer shown in the HUD speaks, and only
--- while it runs with auto_countdown on.
-
--- ClientThink's thresholds: each warning fires once the time left drops to
--- its mark, at most one per think, in this order.
-local WARNINGS = {
-	{ at = 61, seconds = 60 },
-	{ at = 31, seconds = 30 },
-	{ at = 11, seconds = 10 },
-	{ at = 6, seconds = 5 },
-	{ at = 5, seconds = 4 },
-	{ at = 4, seconds = 3 },
-	{ at = 3, seconds = 2 },
-	{ at = 2, seconds = 1 },
-}
+-- The round announcer as each TF2 client plays it. The timer's countdown is
+-- CTeamRoundTimer::ClientThink (teamplay_round_timer.cpp): "Mission begins
+-- in 60 seconds" ... "1" through setup, "Mission ends in ..." through normal
+-- time, and the siren when setup gives way to the round. Only the timer shown
+-- in the HUD speaks, and only while it runs with auto_countdown on. Overtime
+-- is CTFGameRules::HandleOvertimeBegin. Win, loss, stalemate and sudden death
+-- music arrive from the server as tf2.sound.
+TF2.RoundsLib = include("lib_rounds.lua")
 
 local SETUP_SOUND = {
 	[60] = "Announcer.RoundBegins60Seconds", [30] = "Announcer.RoundBegins30Seconds",
@@ -32,6 +22,7 @@ local ROUND_SOUND = {
 }
 
 local ROUND_START_BELL = "Ambient.Siren"
+local OVERTIME = "Game.Overtime"
 
 local function Play(name)
 	local ply = LocalPlayer()
@@ -43,18 +34,17 @@ net.Receive("tf2.sound", function()
 end)
 
 local serial, wasSetup
-local pending = {}
+local wasOvertime = false
+local armed = {}
 
--- CalculateOutputMessages: a warning is armed while there is at least that
--- much time left, recomputed whenever the timer's length changes.
-local function Arm(left)
-	pending = {}
-	for _, w in ipairs(WARNINGS) do
-		pending[w.seconds] = left >= w.seconds
-	end
+-- OnDataChanged: overtime beginning is announced once.
+local function OvertimeThink()
+	local overtime = GetGlobal2Bool("tf2.overtime", false)
+	if overtime and not wasOvertime then Play(OVERTIME) end
+	wasOvertime = overtime
 end
 
-function TF2.AnnouncerThink()
+local function CountdownThink()
 	if not GetGlobal2Bool("tf2.timer.show", false) then return end
 	local setup = GetGlobal2Bool("tf2.timer.setup", false)
 	local paused = GetGlobal2Bool("tf2.timer.paused", true)
@@ -70,18 +60,22 @@ function TF2.AnnouncerThink()
 	if wasSetup == true and not setup and speaks then Play(ROUND_START_BELL) end
 	wasSetup = setup
 
+	-- The warnings are re-armed whenever the timer's length changes.
 	local s = GetGlobal2Int("tf2.timer.serial", 0)
 	if s ~= serial then
 		serial = s
-		Arm(left)
+		armed = TF2.RoundsLib.ArmClientWarnings(left)
 	end
 	if paused then return end
 
-	for _, w in ipairs(WARNINGS) do
-		if left <= w.at and pending[w.seconds] then
-			pending[w.seconds] = false
-			if speaks then Play((setup and SETUP_SOUND or ROUND_SOUND)[w.seconds]) end
-			return
-		end
+	local warning = TF2.RoundsLib.NextClientWarning(armed, left)
+	if warning then
+		armed[warning] = false
+		if speaks then Play((setup and SETUP_SOUND or ROUND_SOUND)[warning]) end
 	end
+end
+
+function TF2.AnnouncerThink()
+	OvertimeThink()
+	CountdownThink()
 end
