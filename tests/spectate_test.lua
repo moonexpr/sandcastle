@@ -75,7 +75,10 @@ end)
 T.test("observer points are fixed cameras", function()
 	T.eq(S.ViewMode("in_eye", "point"), "fixed")
 	T.eq(S.ViewMode("chase", "point"), "fixed")
-	T.eq(S.ViewMode("roaming", "point"), "fixed")
+end)
+
+T.test("roaming from an observer point flies free from it", function()
+	T.eq(S.ViewMode("roaming", "point"), "roaming")
 end)
 
 T.test("non-player entities cannot be watched in first person", function()

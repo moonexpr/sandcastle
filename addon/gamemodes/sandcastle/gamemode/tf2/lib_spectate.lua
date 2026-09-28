@@ -57,13 +57,14 @@ function S.NextMode(mode, isSpectator)
 	return nextMode
 end
 
--- The mode the camera shows for a target kind. An observer point is a fixed
--- camera (C_BasePlayer::CalcChaseCamView treats a model-less target so);
--- only players can be watched in-eye (CTFPlayer::ValidateCurrentObserverTarget);
+-- The mode the camera shows for a target kind. Roaming stays roaming (it
+-- starts from the target). An observer point is a fixed camera
+-- (C_BasePlayer::CalcChaseCamView treats a model-less target so); only
+-- players can be watched in-eye (CTFPlayer::ValidateCurrentObserverTarget);
 -- without a target the view holds still (ValidateCurrentObserverTarget, TF_DLL).
 function S.ViewMode(mode, kind)
-	if kind == "point" then return "fixed" end
-	if kind == nil then return mode == "roaming" and "roaming" or "fixed" end
+	if mode == "roaming" then return "roaming" end
+	if kind == "point" or kind == nil then return "fixed" end
 	if kind == "entity" and mode ~= "chase" then return "chase" end
 	return mode
 end
