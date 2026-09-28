@@ -17,6 +17,14 @@ function TF2.BroadcastSound(team, name)
 	net.Send(recipients)
 end
 
+-- A game sound from an entity that only one player hears
+-- (CSingleUserRecipientFilter): pickup and resupply sounds.
+function TF2.PlaySoundTo(ply, ent, name)
+	local filter = RecipientFilter()
+	filter:AddPlayer(ply)
+	ent:EmitSound(name, 75, 100, 1, CHAN_AUTO, 0, 0, filter)
+end
+
 -- Sent by the client once it has finished loading (InitPostEntity).
 net.Receive("tf2.ready", function(_, ply)
 	ply.tf2Ready = true
@@ -140,10 +148,10 @@ function TF2.GiveAmmoFraction(ply, fraction)
 	for _, wep in ipairs(ply:GetWeapons()) do
 		local ammoType = wep:GetPrimaryAmmoType()
 		if ammoType >= 0 then
-			local ceiling = AmmoCeiling(wep, ammoType)
 			local have = ply:GetAmmoCount(ammoType)
-			if have < ceiling then
-				ply:SetAmmo(math.min(ceiling, have + math.ceil(ceiling * fraction)), ammoType)
+			local after = TF2.PlayerRules.AmmoAfterPack(have, AmmoCeiling(wep, ammoType), fraction)
+			if after > have then
+				ply:SetAmmo(after, ammoType)
 				gave = true
 			end
 		end
