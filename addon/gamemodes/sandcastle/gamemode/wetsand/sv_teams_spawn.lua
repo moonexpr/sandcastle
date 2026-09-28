@@ -10,10 +10,10 @@ local S = include("lib_teams_spawn.lua")
 local records = setmetatable({}, { __mode = "k" })
 
 -- The spawn's TF2 state (see lib_teams_spawn.lua for the fields).
-function TF2.SpawnState(ent)
+function WETSAND.SpawnState(ent)
 	local s = records[ent]
 	if not s then
-		s = S.FromKeyValues(TF2.KeyValues(ent))
+		s = S.FromKeyValues(WETSAND.KeyValues(ent))
 		records[ent] = s
 	end
 	return s
@@ -32,14 +32,14 @@ hook.Add("AcceptInput", "tf2.teamspawn", function(ent, input, activator, caller,
 	if ent:GetClass() ~= "info_player_teamspawn" then return end
 	local handler = SPAWN_INPUTS[string.lower(input)]
 	if not handler then return end
-	handler(TF2.SpawnState(ent), value)
+	handler(WETSAND.SpawnState(ent), value)
 	return true
 end)
 
 local function TeamSpawns()
 	local list = ents.FindByClass("info_player_teamspawn")
 	local states = {}
-	for i, ent in ipairs(list) do states[i] = TF2.SpawnState(ent) end
+	for i, ent in ipairs(list) do states[i] = WETSAND.SpawnState(ent) end
 	return list, states
 end
 
@@ -52,13 +52,13 @@ end
 
 local function PointOwner(name)
 	local point = ControlPoint(name)
-	if IsValid(point) then return TF2.CapTeam(point) end
+	if IsValid(point) then return WETSAND.CapTeam(point) end
 	return nil
 end
 
 local function PointIndex(name)
 	local point = ControlPoint(name)
-	if IsValid(point) then return TF2.PointIndex(point) end
+	if IsValid(point) then return WETSAND.PointIndex(point) end
 	return nil
 end
 
@@ -66,9 +66,9 @@ local function ControlPoints()
 	local points = {}
 	for _, ent in ipairs(ents.FindByClass("team_control_point")) do
 		points[#points + 1] = {
-			index = TF2.PointIndex(ent),
-			owner = TF2.CapTeam(ent),
-			defaultOwner = tonumber(TF2.KeyValues(ent).point_default_owner) or 0,
+			index = WETSAND.PointIndex(ent),
+			owner = WETSAND.CapTeam(ent),
+			defaultOwner = tonumber(WETSAND.KeyValues(ent).point_default_owner) or 0,
 		}
 	end
 	return points
@@ -110,7 +110,7 @@ end
 -- CTFGameRules::SetupOnRoundStart sends RoundActivate to every entity once
 -- the spawns are set: rooms take their team from them, then the forcefields
 -- from the rooms, and team filters from their control points.
-function TF2.RoundActivateSpawnRooms()
+function WETSAND.RoundActivateSpawnRooms()
 	for _, class in ipairs({ "func_respawnroom", "func_respawnroomvisualizer", "filter_activator_tfteam" }) do
 		for _, ent in ipairs(ents.FindByClass(class)) do ent:RoundActivate() end
 	end
@@ -121,14 +121,14 @@ end
 -- the round's hooks reach this module.
 local function EnsureRoundSetup()
 	if PlayingMiniRounds() then
-		local round = TF2.CurrentRound()
+		local round = WETSAND.CurrentRound()
 		if not IsValid(round) or round == applied.round then return end
 		SetupMiniRound(round)
 	else
 		if applied.controlSpawns or #ents.FindByClass("team_control_point_master") == 0 then return end
 		SetupControlPointSpawns()
 	end
-	TF2.RoundActivateSpawnRooms()
+	WETSAND.RoundActivateSpawnRooms()
 end
 
 -- A mini-round is (re)selected: set its spawns up even if it is the same one.
@@ -139,7 +139,7 @@ end)
 
 hook.Add("TF2RoundActive", "tf2.spawns", function()
 	EnsureRoundSetup()
-	TF2.RoundActivateSpawnRooms()
+	WETSAND.RoundActivateSpawnRooms()
 end)
 
 hook.Add("TF2PointCaptured", "tf2.spawns", function()
@@ -147,7 +147,7 @@ hook.Add("TF2PointCaptured", "tf2.spawns", function()
 end)
 
 -- The valid spawn points of a team for the round being played.
-function TF2.SpawnPoints(team)
+function WETSAND.SpawnPoints(team)
 	EnsureRoundSetup()
 	local list, states = TeamSpawns()
 	local points = {}
@@ -173,7 +173,7 @@ local lastSpawn = {}
 
 -- CTFPlayer::EntSelectSpawnPoint for RED and BLU: the next valid spot after
 -- the team's last one, clear of players if any is; nil when there is none.
-function TF2.PickSpawn(team)
+function WETSAND.PickSpawn(team)
 	EnsureRoundSetup()
 	local list, states = TeamSpawns()
 	local last = table.KeyFromValue(list, lastSpawn[team])

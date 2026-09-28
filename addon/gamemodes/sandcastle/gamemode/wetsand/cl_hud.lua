@@ -36,7 +36,7 @@ local function DrawTimer(w, h)
 		left = GetGlobal2Float("tf2.timer.end", 0) - CurTime()
 	end
 	local label
-	if TF2.State() == TF2.STATE.PREROUND then
+	if WETSAND.State() == WETSAND.STATE.PREROUND then
 		label = "PREPARE"
 	elseif GetGlobal2Bool("tf2.timer.setup", false) then
 		label = "SETUP"
@@ -109,11 +109,11 @@ local function DrawTrack(cart, x, y, barW, barH)
 		surface.SetDrawColor(c.r, c.g, c.b, 255)
 		surface.DrawRect(x + barW * hill.from, y + barH - 4, barW * math.max(hill.to - hill.from, 0), 4)
 	end
-	local tc = TF2.TeamColor[cart.team] or TF2.TeamColor[0]
+	local tc = WETSAND.TeamColor[cart.team] or WETSAND.TeamColor[0]
 	surface.SetDrawColor(tc.r, tc.g, tc.b, 255)
 	surface.DrawRect(x, y, barW * cart.progress, barH - 4)
 	for i, fraction in ipairs(cart.cps) do
-		local c = TF2.TeamColor[cart.owners[i] or 0] or TF2.TeamColor[0]
+		local c = WETSAND.TeamColor[cart.owners[i] or 0] or WETSAND.TeamColor[0]
 		draw.RoundedBox(4, x + barW * fraction - 7, y - 4, 14, barH + 8, c)
 	end
 end
@@ -131,9 +131,9 @@ local function DrawCartBar(cart, x, y, barW, race, leader)
 	DrawTrack(cart, x, y, barW, barH)
 	DrawMarker(cart, x, y, barW)
 	if race then
-		local label = TF2.TeamName[cart.team] or ""
+		local label = WETSAND.TeamName[cart.team] or ""
 		if leader == cart.team then label = label .. " LEADS" end
-		draw.SimpleText(label, "TF2Ents.Label", x - 14, y + barH / 2, TF2.TeamColor[cart.team] or color_white, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+		draw.SimpleText(label, "TF2Ents.Label", x - 14, y + barH / 2, WETSAND.TeamColor[cart.team] or color_white, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 	end
 	local status = CartStatus(cart)
 	if status ~= "" then
@@ -168,12 +168,12 @@ local function Capture(i)
 end
 
 local function DrawCapture(cap, x, y, size)
-	local owner = TF2.TeamColor[cap.owner] or TF2.TeamColor[0]
+	local owner = WETSAND.TeamColor[cap.owner] or WETSAND.TeamColor[0]
 	draw.RoundedBox(6, x, y, size, size, Color(0, 0, 0, 170))
 	draw.RoundedBox(4, x + 4, y + 4, size - 8, size - 8, Color(owner.r, owner.g, owner.b, 200))
 	draw.SimpleText(tostring(cap.index + 1), "TF2Ents.Timer", x + size / 2, y + size / 2 - 4, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	if cap.capping == 0 then return end
-	local c = TF2.TeamColor[cap.capping] or color_white
+	local c = WETSAND.TeamColor[cap.capping] or color_white
 	surface.SetDrawColor(20, 20, 20, 255)
 	surface.DrawRect(x + 4, y + size - 12, size - 8, 8)
 	surface.SetDrawColor(c.r, c.g, c.b, 255)
@@ -195,7 +195,7 @@ end
 
 local function DrawAnnouncement(w, h)
 	if not announcement or CurTime() > announcement.expires then return end
-	local c = TF2.TeamColor[announcement.team] or color_white
+	local c = WETSAND.TeamColor[announcement.team] or color_white
 	draw.SimpleTextOutlined(announcement.text, "TF2Ents.Announce", w / 2, h * 0.25, c, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, color_black)
 end
 
@@ -210,12 +210,12 @@ local function DrawRespawn(w, h)
 end
 
 local function DrawPreround(w, h)
-	if TF2.State() ~= TF2.STATE.PREROUND then return end
+	if WETSAND.State() ~= WETSAND.STATE.PREROUND then return end
 	local left = math.max(1, math.ceil(GetGlobal2Float("tf2.preroundEnd", 0) - CurTime()))
 	draw.SimpleTextOutlined("Round begins in " .. left, "TF2Ents.Announce", w / 2, h * 0.35, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, color_black)
 end
 
-function TF2.DrawHUD()
+function WETSAND.DrawHUD()
 	local w, h = ScrW(), ScrH()
 	DrawTimer(w, h)
 	DrawCarts(w, h)

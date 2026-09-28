@@ -1,7 +1,7 @@
 -- trigger_stun (CTriggerStun): trigger_delay after the first touch, stuns
 -- every player inside every 0.5s while it finds anyone; a player who leaves
 -- without having been stunned in the last pass is stunned on the way out.
--- The stun is TF2.StunPlayer's: stun_type 0 slows by move_speed_reduction,
+-- The stun is WETSAND.StunPlayer's: stun_type 0 slows by move_speed_reduction,
 -- 1 also takes controls, 2 is the loser state (no attacking).
 ENT.Type = "brush"
 ENT.Base = "wetsand_trigger_volume"
@@ -12,14 +12,14 @@ function ENT:TriggerInit()
 	self.delay = tonumber(self:Key("trigger_delay", 0)) or 0
 	self.duration = tonumber(self:Key("stun_duration", 0)) or 0
 	self.reduction = tonumber(self:Key("move_speed_reduction", 0)) or 0
-	self.flags = TF2.PlayerRules.StunFlags(tonumber(self:Key("stun_type", 0)) or 0)
+	self.flags = WETSAND.PlayerRules.StunFlags(tonumber(self:Key("stun_type", 0)) or 0)
 	self.stunned = {}
 end
 
 -- CTriggerStun::StunEntity: only what can take damage, so not the dead.
 function ENT:StunEntity(ply)
 	if not ply:Alive() or not self:PassesTriggerFilters(ply) then return false end
-	TF2.StunPlayer(ply, self.duration, self.reduction, self.flags)
+	WETSAND.StunPlayer(ply, self.duration, self.reduction, self.flags)
 	self:TriggerOutput("OnStunPlayer", ply)
 	self.stunned[ply] = true
 	return true

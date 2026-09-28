@@ -34,13 +34,13 @@ end
 -- team_<field>_2 and _3 as numbers.
 function ENT:TeamKeys(field, default)
 	return {
-		[TF2.TEAM_RED] = tonumber(self:Key(field .. "_2", default)) or default,
-		[TF2.TEAM_BLUE] = tonumber(self:Key(field .. "_3", default)) or default,
+		[WETSAND.TEAM_RED] = tonumber(self:Key(field .. "_2", default)) or default,
+		[WETSAND.TEAM_BLUE] = tonumber(self:Key(field .. "_3", default)) or default,
 	}
 end
 
 function ENT:Initialize()
-	C = TF2.PayloadCapture
+	C = WETSAND.PayloadCapture
 	if self.brushModel then self:SetModel(self.brushModel) end
 	self:SetSolid(SOLID_NONE)
 	self:SetNoDraw(true)
@@ -48,20 +48,20 @@ function ENT:Initialize()
 	self.pointName = self:Key("area_cap_point")
 	self.capTime = tonumber(self:Key("area_time_to_cap", 5)) or 5
 	local canCap = self:TeamKeys("team_cancap", 1)
-	self.canCap = { [TF2.TEAM_RED] = canCap[TF2.TEAM_RED] ~= 0, [TF2.TEAM_BLUE] = canCap[TF2.TEAM_BLUE] ~= 0 }
+	self.canCap = { [WETSAND.TEAM_RED] = canCap[WETSAND.TEAM_RED] ~= 0, [WETSAND.TEAM_BLUE] = canCap[WETSAND.TEAM_BLUE] ~= 0 }
 	-- Spawn: at least one player is always required
 	self.numRequired = self:TeamKeys("team_numcap", 1)
 	self.startRequired = self:TeamKeys("team_startcap", 1)
-	for _, t in ipairs({ TF2.TEAM_RED, TF2.TEAM_BLUE }) do
+	for _, t in ipairs({ WETSAND.TEAM_RED, WETSAND.TEAM_BLUE }) do
 		self.numRequired[t] = math.max(self.numRequired[t], 1)
 		self.startRequired[t] = math.max(self.startRequired[t], 1)
 	end
 	self.spawnAdjust = self:TeamKeys("team_spawn", 0)
-	self.cap = C.New(TF2.TEAM_UNASSIGNED)
+	self.cap = C.New(WETSAND.TEAM_UNASSIGNED)
 end
 
 function ENT:Point()
-	return TF2.FindByName(self.pointName)
+	return WETSAND.FindByName(self.pointName)
 end
 
 -- The watcher that moves the train this area rides (SetTrainWatcher).
@@ -80,18 +80,18 @@ end
 -- Counting players ------------------------------------------------------------------------
 
 -- CaptureThink counts a team only if the rules let it capture the point
--- (TeamMayCapturePoint). TF2.TeamCanCapPoint also refuses the owner and teams
+-- (TeamMayCapturePoint). WETSAND.TeamCanCapPoint also refuses the owner and teams
 -- this area never lets cap, which still count here: they defend and block.
 function ENT:TeamCounts(point, team)
-	return team == self.cap.owner or not self.canCap[team] or TF2.TeamCanCapPoint(point, team)
+	return team == self.cap.owner or not self.canCap[team] or WETSAND.TeamCanCapPoint(point, team)
 end
 
 -- A disabled trigger touches nobody.
 function ENT:Counts(point)
-	local counts = { [TF2.TEAM_RED] = 0, [TF2.TEAM_BLUE] = 0 }
+	local counts = { [WETSAND.TEAM_RED] = 0, [WETSAND.TEAM_BLUE] = 0 }
 	if not self.enabled then return counts end
-	for _, ply in ipairs(TF2.PlayersInside(self)) do
-		local team = TF2.TeamOf(ply)
+	for _, ply in ipairs(WETSAND.PlayersInside(self)) do
+		local team = WETSAND.TeamOf(ply)
 		if counts[team] and self:TeamCounts(point, team) then counts[team] = counts[team] + 1 end
 	end
 	return counts
@@ -100,7 +100,7 @@ end
 function ENT:StepInput(point)
 	return {
 		now = CurTime(),
-		pointsMayBeCaptured = not IsValid(TF2.Rules) or TF2.Rules:PointsMayBeCaptured(),
+		pointsMayBeCaptured = not IsValid(WETSAND.Rules) or WETSAND.Rules:PointsMayBeCaptured(),
 		counts = self:Counts(point),
 		canCap = self.canCap,
 		numRequired = self.numRequired,
@@ -110,7 +110,7 @@ function ENT:StepInput(point)
 		blockstyle = blockstyle:GetInt(),
 		deteriorate = capdeteriorate:GetFloat(),
 		overtime = GetGlobal2Bool("tf2.overtime", false),
-		teamMayCapture = function(team) return TF2.TeamCanCapPoint(point, team) end,
+		teamMayCapture = function(team) return WETSAND.TeamCanCapPoint(point, team) end,
 	}
 end
 
@@ -130,10 +130,10 @@ end
 -- HandleRespawnTimeAdjustments, then the point changes hands.
 function ENT:ChangeOwner(point, old, team)
 	for _, adjust in ipairs(C.SpawnAdjustments(old, team, self.spawnAdjust)) do
-		local input = adjust.team == TF2.TEAM_RED and "AddRedTeamRespawnWaveTime" or "AddBlueTeamRespawnWaveTime"
-		TF2.Rules:Fire(input, tostring(adjust.seconds))
+		local input = adjust.team == WETSAND.TEAM_RED and "AddRedTeamRespawnWaveTime" or "AddBlueTeamRespawnWaveTime"
+		WETSAND.Rules:Fire(input, tostring(adjust.seconds))
 	end
-	TF2.SetPointOwner(point, team, self)
+	WETSAND.SetPointOwner(point, team, self)
 end
 
 local EVENTS = {
@@ -141,11 +141,11 @@ local EVENTS = {
 		self:TriggerOutput("OnStart" .. TEAM_OUTPUT[e.team], self)
 		self:TriggerOutput("OnStartCap", self)
 	end,
-	capturestart = function(self, point, e) TF2.PointCaptureStarted(point, e.team) end,
+	capturestart = function(self, point, e) WETSAND.PointCaptureStarted(point, e.team) end,
 	numcappers = function(self, point, e) self:SetNumCappers(e.n, e.blocked) end,
 	-- UpdateBlocked: the point hears a block when it starts
 	blocked = function(self, point, e)
-		if e.value then TF2.PointCaptureBlocked(point, TF2.EnemyOf(e.capping)) end
+		if e.value then WETSAND.PointCaptureBlocked(point, WETSAND.EnemyOf(e.capping)) end
 	end,
 	["break"] = function(self, point, e)
 		self:TriggerOutput("OnBreak" .. TEAM_OUTPUT[e.team], self)
@@ -167,7 +167,7 @@ function ENT:Think()
 	self:NextThink(CurTime() + THINK_TIME)
 	local point = self:Point()
 	if not IsValid(point) then return true end
-	self.cap.owner = TF2.CapTeam(point)
+	self.cap.owner = WETSAND.CapTeam(point)
 	self.lastInput = self:StepInput(point)
 	self:Apply(point, C.Step(self.cap, self.lastInput))
 	return true
@@ -178,8 +178,8 @@ function ENT:HudState()
 	local point = self:Point()
 	if not self.enabled or not IsValid(point) or not self.lastInput then return nil end
 	return {
-		index = TF2.PointIndex(point),
-		owner = TF2.CapTeam(point),
+		index = WETSAND.PointIndex(point),
+		owner = WETSAND.CapTeam(point),
 		capping = self.cap.cappingTeam,
 		progress = C.Progress(self.cap, self.lastInput),
 		blocked = self.cap.blocked,
@@ -197,7 +197,7 @@ local INPUTS = {
 		if IsValid(old) then self:Apply(old, events) end
 		self.pointName = tostring(value)
 		local point = self:Point()
-		if IsValid(point) then self.cap.owner = TF2.CapTeam(point) end
+		if IsValid(point) then self.cap.owner = WETSAND.CapTeam(point) end
 	end,
 	capturecurrentcp = function(self)
 		local point = self:Point()

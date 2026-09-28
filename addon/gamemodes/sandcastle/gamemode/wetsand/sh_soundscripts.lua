@@ -80,7 +80,7 @@ local function LoadFile(path)
 	return added
 end
 
-function TF2.LoadSoundScripts()
+function WETSAND.LoadSoundScripts()
 	local manifest = file.Read("scripts/game_sounds_manifest.txt", "tf")
 	if not manifest then return 0 end
 	local files = util.KeyValuesToTablePreserveOrder(manifest, false, true)
@@ -94,4 +94,4 @@ function TF2.LoadSoundScripts()
 	return added
 end
 
-TF2.SoundScriptsAdded = TF2.LoadSoundScripts()
+WETSAND.SoundScriptsAdded = WETSAND.LoadSoundScripts()

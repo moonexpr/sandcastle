@@ -1,6 +1,6 @@
 -- team_round_timer: the round clock, with an optional setup phase first
 -- (CTeamRoundTimer, teamplay_round_timer.cpp). A map may have several; the
--- one shown in the HUD (TF2.HudTimer) publishes the tf2.timer.* keys, speaks
+-- one shown in the HUD (WETSAND.HudTimer) publishes the tf2.timer.* keys, speaks
 -- the countdown on clients, and puts the round into overtime.
 ENT.Type = "point"
 ENT.Base = "base_point"
@@ -56,7 +56,7 @@ function ENT:Initialize()
 end
 
 function ENT:OnRemove()
-	if TF2.IsHudTimer(self) then TF2.SetActiveTimer(nil) end
+	if WETSAND.IsHudTimer(self) then WETSAND.SetActiveTimer(nil) end
 end
 
 function ENT:UpdateTransmitState()
@@ -71,7 +71,7 @@ function ENT:TimeRemaining()
 end
 
 function ENT:Publish()
-	if not TF2.IsHudTimer(self) then return end
+	if not WETSAND.IsHudTimer(self) then return end
 	SetGlobal2Bool("tf2.timer.show", true)
 	SetGlobal2Bool("tf2.timer.paused", self.paused)
 	SetGlobal2Float("tf2.timer.left", self:TimeRemaining())
@@ -84,7 +84,7 @@ end
 -- Every change to the timer's length bumps the serial, which is how clients
 -- re-arm their countdown (the client's CalculateOutputMessages on a length change).
 function ENT:LengthChanged()
-	self.armed = TF2.RoundsLib.ArmTimerOutputs(self:TimeRemaining())
+	self.armed = WETSAND.RoundsLib.ArmTimerOutputs(self:TimeRemaining())
 	self.serial = self.serial + 1
 	self:Publish()
 end
@@ -119,7 +119,7 @@ end
 -- CTeamRoundTimer::SetState: every timer tells the gamerules whether it is in setup.
 function ENT:SetState(state, fireOutput)
 	self.state = state
-	TF2.SetSetup(state == STATE_SETUP)
+	WETSAND.SetSetup(state == STATE_SETUP)
 	if fireOutput then
 		self:TriggerOutput(state == STATE_SETUP and "OnSetupStart" or "OnRoundStart", self)
 	end
@@ -128,7 +128,7 @@ end
 
 -- CTeamRoundTimer::InputRoundSpawn, sent at every round start (full or mini).
 function ENT:RoundSpawn()
-	self.timeAfterSetup = TF2.RoundsLib.TimeAfterSetup(self.resetTime == 1, self.state == STATE_NORMAL,
+	self.timeAfterSetup = WETSAND.RoundsLib.TimeAfterSetup(self.resetTime == 1, self.state == STATE_NORMAL,
 		self:TimeRemaining(), self.timerLength)
 	if self.setupLength > 0 then
 		self:SetState(STATE_SETUP, true)
@@ -143,19 +143,19 @@ end
 -- Thinking -----------------------------------------------------------------------------
 
 local function RoundWon()
-	return TF2.Active() and TF2.State() == TF2.STATE.TEAM_WIN
+	return WETSAND.Active() and WETSAND.State() == WETSAND.STATE.TEAM_WIN
 end
 
 function ENT:FireMark(mark)
 	self.armed[mark] = false
-	self:TriggerOutput(TF2.RoundsLib.TimerOutputName(mark), self)
+	self:TriggerOutput(WETSAND.RoundsLib.TimerOutputName(mark), self)
 end
 
 -- RoundTimerSetupThink
 function ENT:SetupThink()
-	TF2.SetOvertime(false)
+	WETSAND.SetOvertime(false)
 	local left = self:TimeRemaining()
-	local next = TF2.RoundsLib.NextTimerOutput(self.armed, left, true)
+	local next = WETSAND.RoundsLib.NextTimerOutput(self.armed, left, true)
 	if next == "finished" then
 		self.armed.finished = false
 		self:TriggerOutput("OnSetupFinished", self)
@@ -174,14 +174,14 @@ function ENT:NormalThink()
 		return
 	end
 	local left = self:TimeRemaining()
-	local hud = TF2.IsHudTimer(self)
-	if left > 0 and hud then TF2.SetOvertime(false) end
-	local next = TF2.RoundsLib.NextTimerOutput(self.armed, left, false)
+	local hud = WETSAND.IsHudTimer(self)
+	if left > 0 and hud then WETSAND.SetOvertime(false) end
+	local next = WETSAND.RoundsLib.NextTimerOutput(self.armed, left, false)
 	if next == "finished" then
-		if not TF2.TimerMayExpire() then
+		if not WETSAND.TimerMayExpire() then
 			self.endTime = CurTime()
 			if hud then
-				if TF2.InOvertime() then TF2.OvertimeNag() else TF2.SetOvertime(true) end
+				if WETSAND.InOvertime() then WETSAND.OvertimeNag() else WETSAND.SetOvertime(true) end
 			end
 			return
 		end
@@ -203,11 +203,11 @@ end
 
 -- The announcer credits the team the time was added for (AddTeamTime).
 local function AnnounceTimeAdded(team)
-	if team == TF2.TEAM_RED or team == TF2.TEAM_BLUE then
-		TF2.BroadcastSound(team, "Announcer.TimeAwardedForTeam")
-		TF2.BroadcastSound(TF2.EnemyOf(team), "Announcer.TimeAddedForEnemy")
+	if team == WETSAND.TEAM_RED or team == WETSAND.TEAM_BLUE then
+		WETSAND.BroadcastSound(team, "Announcer.TimeAwardedForTeam")
+		WETSAND.BroadcastSound(WETSAND.EnemyOf(team), "Announcer.TimeAddedForEnemy")
 	else
-		TF2.BroadcastSound(TF2.TEAM_UNASSIGNED, "Announcer.TimeAdded")
+		WETSAND.BroadcastSound(WETSAND.TEAM_UNASSIGNED, "Announcer.TimeAdded")
 	end
 end
 
@@ -215,21 +215,21 @@ end
 -- been won); only the HUD timer speaks, and not once the round is decided.
 function ENT:AddTimerSeconds(seconds, team)
 	if self.disabled then return end
-	if TF2.Active() then
-		local state = TF2.State()
-		if state ~= TF2.STATE.RND_RUNNING and state ~= TF2.STATE.TEAM_WIN then return end
+	if WETSAND.Active() then
+		local state = WETSAND.State()
+		if state ~= WETSAND.STATE.RND_RUNNING and state ~= WETSAND.STATE.TEAM_WIN then return end
 	end
-	seconds = TF2.RoundsLib.ClampAdd(self:TimeRemaining(), seconds, self.maxLength)
+	seconds = WETSAND.RoundsLib.ClampAdd(self:TimeRemaining(), seconds, self.maxLength)
 	if self.paused then
 		self.remaining = self.remaining + seconds
 	else
 		self.endTime = self.endTime + seconds
 	end
 	self:LengthChanged()
-	if TF2.IsHudTimer(self) and not RoundWon() then
+	if WETSAND.IsHudTimer(self) and not RoundWon() then
 		AnnounceTimeAdded(team)
 		if seconds > 0 then
-			TF2.Announce(string.format("+%d:%02d", math.floor(seconds / 60), seconds % 60), 0)
+			WETSAND.Announce(string.format("+%d:%02d", math.floor(seconds / 60), seconds % 60), 0)
 		end
 	end
 end
@@ -239,13 +239,13 @@ end
 function ENT:Enable()
 	self.disabled = false
 	self:Resume()
-	if self.showInHud == 1 then TF2.SetActiveTimer(self) end
+	if self.showInHud == 1 then WETSAND.SetActiveTimer(self) end
 end
 
 function ENT:Disable()
 	self:Pause()
 	self.disabled = true
-	if self.showInHud == 1 then TF2.SetActiveTimer(nil) end
+	if self.showInHud == 1 then WETSAND.SetActiveTimer(nil) end
 end
 
 -- CTeamRoundTimer::InputShowInHUD; the flag is cleared before a replacement is
@@ -253,10 +253,10 @@ end
 function ENT:ShowInHUD(show)
 	if self.showInHud == 1 and show == 0 then
 		self.showInHud = 0
-		TF2.SetActiveTimer(nil)
+		WETSAND.SetActiveTimer(nil)
 	elseif show == 1 then
 		self.showInHud = 1
-		TF2.SetActiveTimer(self)
+		WETSAND.SetActiveTimer(self)
 		self:SetState(self.state, false)
 	else
 		self.showInHud = show

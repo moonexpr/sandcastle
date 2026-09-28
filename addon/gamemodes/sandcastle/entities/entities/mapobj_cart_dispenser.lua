@@ -28,7 +28,7 @@ function ENT:Key(name, default)
 end
 
 function ENT:Initialize()
-	self.team = tonumber(self:Key("teamnum", TF2.TEAM_RED)) or TF2.TEAM_RED
+	self.team = tonumber(self:Key("teamnum", WETSAND.TEAM_RED)) or WETSAND.TEAM_RED
 	self.spawnflags = tonumber(self:Key("spawnflags", 0)) or 0
 	self.level = 1
 	self.disabled = false
@@ -43,14 +43,14 @@ end
 
 -- Players in range: the touch_trigger's volume, or a cube of DEFAULT_RADIUS.
 function ENT:Touching()
-	local trigger = TF2.FindByName(self:Key("touch_trigger"))
+	local trigger = WETSAND.FindByName(self:Key("touch_trigger"))
 	if IsValid(trigger) then
 		if not trigger:IsEnabled() then return {} end
-		return TF2.PlayersInside(trigger)
+		return WETSAND.PlayersInside(trigger)
 	end
 	local inside, extent = {}, Vector(DEFAULT_RADIUS, DEFAULT_RADIUS, DEFAULT_RADIUS) + HULL
 	for _, ply in ipairs(player.GetAll()) do
-		if TF2.IsAliveInGame(ply) and (ply:WorldSpaceCenter() - self:GetPos()):WithinAABox(-extent, extent) then
+		if WETSAND.IsAliveInGame(ply) and (ply:WorldSpaceCenter() - self:GetPos()):WithinAABox(-extent, extent) then
 			inside[#inside + 1] = ply
 		end
 	end
@@ -61,7 +61,7 @@ local MASK_DISPENSER = bit.bor(MASK_BLOCKLOS, CONTENTS_WINDOW)
 
 -- CouldHealTarget: a teammate the dispenser can see (unless the map waives it).
 function ENT:CouldHeal(ply)
-	if TF2.TeamOf(ply) ~= self.team then return false end
+	if WETSAND.TeamOf(ply) ~= self.team then return false end
 	if bit.band(self.spawnflags, SF_IGNORE_LOS) ~= 0 then return true end
 	local tr = util.TraceLine({ start = ply:EyePos(), endpos = self:GetPos(), mask = MASK_DISPENSER, filter = { ply, self:GetParent() } })
 	return not tr.Hit
@@ -82,7 +82,7 @@ end
 
 -- DispenseAmmo: a share of every reserve; the pickup sound when anything was taken.
 function ENT:DispenseAmmo(ply)
-	if not TF2.GiveAmmoFraction(ply, AMMO_RATES[self.level]) then return false end
+	if not WETSAND.GiveAmmoFraction(ply, AMMO_RATES[self.level]) then return false end
 	EmitSound("BaseCombatCharacter.AmmoPickup", self:GetPos())
 	return true
 end

@@ -5,7 +5,7 @@
 -- with handle_train_movement drives the train itself (speed by pushers,
 -- hills, receding). With handle_train_movement 0 the map moves the train
 -- from the capture area's outputs and the watcher only tracks it.
--- The decisions live in lib_payload.lua (TF2.Payload).
+-- The decisions live in lib_payload.lua (WETSAND.Payload).
 ENT.Type = "point"
 ENT.Base = "base_point"
 
@@ -34,9 +34,9 @@ local function Flag(value)
 end
 
 function ENT:Initialize()
-	P = TF2.Payload
+	P = WETSAND.Payload
 	self.disabled = self:Key("startdisabled", "0") == "1"
-	self.team = tonumber(self:Key("teamnum", TF2.TEAM_BLUE)) or TF2.TEAM_BLUE
+	self.team = tonumber(self:Key("teamnum", WETSAND.TEAM_BLUE)) or WETSAND.TEAM_BLUE
 	self.handleMovement = self:Key("handle_train_movement", "0") == "1"
 	self.canRecede = Flag(self:Key("train_can_recede", "1"))
 	self.trainRecedeTime = tonumber(self:Key("train_recede_time", 0)) or 0
@@ -74,22 +74,22 @@ end
 -- Path -----------------------------------------------------------------------------
 
 local function HillType(node)
-	local flags = tonumber(TF2.KeyValues(node).spawnflags) or 0
+	local flags = tonumber(WETSAND.KeyValues(node).spawnflags) or 0
 	if bit.band(flags, SF_PATH_UPHILL) ~= 0 then return P.HILL_UP end
 	if bit.band(flags, SF_PATH_DOWNHILL) ~= 0 then return P.HILL_DOWN end
 	return P.HILL_NONE
 end
 
 local function NextNode(node)
-	return TF2.FindByName(TF2.KeyValues(node).target)
+	return WETSAND.FindByName(WETSAND.KeyValues(node).target)
 end
 
 -- The chain from start_node to goal_node (or its dead end), with the path
 -- length to each node.
 function ENT:BuildPath()
-	local goal = TF2.FindByName(self:Key("goal_node"))
+	local goal = WETSAND.FindByName(self:Key("goal_node"))
 	self.nodes, self.nodeIndex, self.distanceAt = {}, {}, {}
-	local node, total = TF2.FindByName(self:Key("start_node")), 0
+	local node, total = WETSAND.FindByName(self:Key("start_node")), 0
 	while IsValid(node) and not self.nodeIndex[node] do
 		local i = #self.nodes + 1
 		if i > 1 then total = total + node:GetPos():Distance(self.nodes[i - 1]:GetPos()) end
@@ -105,8 +105,8 @@ end
 function ENT:BuildLinks()
 	self.links = {}
 	for n = 1, MAX_LINKS do
-		local track = TF2.FindByName(self:Key("linked_pathtrack_" .. n))
-		local cp = TF2.FindByName(self:Key("linked_cp_" .. n))
+		local track = WETSAND.FindByName(self:Key("linked_pathtrack_" .. n))
+		local cp = WETSAND.FindByName(self:Key("linked_cp_" .. n))
 		if IsValid(track) and IsValid(cp) then
 			local i = self.nodeIndex[track]
 			self.links[#self.links + 1] = { cp = cp, distance = i and self.distanceAt[i] or 0, alerted = false }
@@ -165,7 +165,7 @@ function ENT:WatcherActivate()
 	self.distanceFromStart = 0
 	self:StopCaptureAlarm()
 	self.alarm = P.NewAlarm()
-	self.train = TF2.FindByName(self:Key("train"))
+	self.train = WETSAND.FindByName(self:Key("train"))
 	self:BuildPath()
 	self:BuildLinks()
 	self:BuildHills()
@@ -261,7 +261,7 @@ function ENT:PathPassed(node, train)
 	-- here and will not pass it again going forward, so keep the hill state
 	if self.receding then
 		local prev = self.nodes[i - 1]
-		if IsValid(prev) and TF2.KeyValues(prev).tf2disabled then return end
+		if IsValid(prev) and WETSAND.KeyValues(prev).tf2disabled then return end
 	end
 	local hill = HillType(node)
 	local update = hill ~= self.hill
@@ -281,9 +281,9 @@ end
 
 -- CTFGameRules::PlayTrainCaptureAlert: everyone hears it, while the round runs.
 function ENT:PlayCaptureAlert(cp)
-	if TF2.State() ~= TF2.STATE.RND_RUNNING then return end
-	local final = TF2.FinalPointInMap(cp)
-	TF2.BroadcastSound(TF2.TEAM_UNASSIGNED, final and "Announcer.Cart.FinalWarning" or "Announcer.Cart.Warning")
+	if WETSAND.State() ~= WETSAND.STATE.RND_RUNNING then return end
+	local final = WETSAND.FinalPointInMap(cp)
+	WETSAND.BroadcastSound(WETSAND.TEAM_UNASSIGNED, final and "Announcer.Cart.FinalWarning" or "Announcer.Cart.Warning")
 end
 
 function ENT:FinalLinkedPoint()
@@ -347,7 +347,7 @@ end
 -- WatcherThink
 function ENT:WatcherThink()
 	self:CheckRecede()
-	local running = TF2.State() == TF2.STATE.RND_RUNNING
+	local running = WETSAND.State() == WETSAND.STATE.RND_RUNNING
 	if not running then self:StopCaptureAlarm() end
 	if not IsValid(self.train) or #self.nodes == 0 then return end
 	-- the train's current speed stands in for its desired speed, which
@@ -402,7 +402,7 @@ function ENT:HudState()
 	local cps, owners = {}, {}
 	for i, link in ipairs(self.links) do
 		cps[i] = link.distance / self.total
-		owners[i] = TF2.CapTeam(link.cp)
+		owners[i] = WETSAND.CapTeam(link.cp)
 	end
 	return {
 		team = self.team,

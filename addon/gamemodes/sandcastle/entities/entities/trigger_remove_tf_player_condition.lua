@@ -11,9 +11,9 @@ end
 function ENT:PlayerStartTouch(ply)
 	if not self:PassesTriggerFilters(ply) then return end
 	if self.condition < 0 then
-		TF2.RemoveAllConditions(ply)
+		WETSAND.RemoveAllConditions(ply)
 	else
-		TF2.RemoveCondition(ply, self.condition)
+		WETSAND.RemoveCondition(ply, self.condition)
 	end
 	self:TriggerOutput("OnStartTouch", ply)
 end

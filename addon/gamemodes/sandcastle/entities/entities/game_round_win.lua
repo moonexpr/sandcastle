@@ -36,9 +36,9 @@ function ENT:UpdateTransmitState()
 end
 
 function ENT:RoundWin()
-	local rules = TF2.Rules
+	local rules = WETSAND.Rules
 	if IsValid(rules) then
-		if self.team > TF2.TEAM_SPECTATOR then
+		if self.team > WETSAND.TEAM_SPECTATOR then
 			rules:SetWinningTeam(self.team, self.winReason, self.forceMapReset, self.forceMapReset and self.switchTeams)
 		else
 			rules:SetStalemate(STALEMATE_TIMER, self.forceMapReset, self.switchTeams)

@@ -1,16 +1,16 @@
 -- Resupply and the ammo pack a dying player drops.
-local P = TF2.PlayerRules
+local P = WETSAND.PlayerRules
 
 -- CTFPlayer::Regenerate(true): full health (an overheal is kept), every
 -- weapon's clips and reserve refilled, fire and the debuffs removed.
-function TF2.RegeneratePlayer(ply)
+function WETSAND.RegeneratePlayer(ply)
 	ply:SetHealth(P.RegenerateHealth(ply:Health(), ply:GetMaxHealth()))
-	TF2.ClearConditionsOnRegenerate(ply)
+	WETSAND.ClearConditionsOnRegenerate(ply)
 	for _, wep in ipairs(ply:GetWeapons()) do
 		if wep:GetMaxClip1() > 0 then wep:SetClip1(wep:GetMaxClip1()) end
 		if wep:GetMaxClip2() > 0 then wep:SetClip2(wep:GetMaxClip2()) end
 	end
-	TF2.GiveAmmoFraction(ply, 1.0)
+	WETSAND.GiveAmmoFraction(ply, 1.0)
 end
 
 -- tf_weapon_ragdoll_velocity_min/max and maxspeed.
@@ -18,7 +18,7 @@ local THROW_MIN, THROW_MAX, THROW_CAP = 100, 150, 300
 
 -- CTFPlayer::DropAmmoPack / CTFAmmoPack::InitAmmoPack: a player with a
 -- weapon drops a medium ammo pack, thrown a little from where they died.
-function TF2.DropAmmoPack(ply)
+function WETSAND.DropAmmoPack(ply)
 	if #ply:GetWeapons() == 0 then return end
 	local pack = ents.Create("tf_ammo_pack")
 	pack:SetPos(ply:WorldSpaceCenter())

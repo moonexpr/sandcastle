@@ -25,12 +25,12 @@ end
 -- TF2's team numbers (1 spectator, 2 RED, 3 BLU); GMod reserves only 0, 1001 and 1002.
 function GM:CreateTeams()
 	self.BaseClass.CreateTeams(self)
-	team.SetUp(TF2.TEAM_SPECTATOR, "Spectator", Color(200, 200, 200), true)
-	team.SetUp(TF2.TEAM_RED, "RED", TF2.TeamColor[TF2.TEAM_RED], false)
-	team.SetUp(TF2.TEAM_BLUE, "BLU", TF2.TeamColor[TF2.TEAM_BLUE], false)
+	team.SetUp(WETSAND.TEAM_SPECTATOR, "Spectator", Color(200, 200, 200), true)
+	team.SetUp(WETSAND.TEAM_RED, "RED", WETSAND.TeamColor[WETSAND.TEAM_RED], false)
+	team.SetUp(WETSAND.TEAM_BLUE, "BLU", WETSAND.TeamColor[WETSAND.TEAM_BLUE], false)
 end
 
 -- Neither Sandbox nor base defines StartCommand, so there is nothing to defer to.
 function GM:StartCommand(ply, cmd)
-	if TF2.Active() then TF2.RestrictCommand(ply, cmd) end
+	if WETSAND.Active() then WETSAND.RestrictCommand(ply, cmd) end
 end

@@ -27,7 +27,7 @@ local killers = setmetatable({}, { __mode = "k" })
 local required = NULL
 
 local function IsSpectator(ply)
-	return ply:Team() == TF2.TEAM_SPECTATOR
+	return ply:Team() == WETSAND.TEAM_SPECTATOR
 end
 
 -- Descriptors for lib_spectate ------------------------------------------------
@@ -35,7 +35,7 @@ end
 local function Rules()
 	return {
 		forcecamera = forcecamera:GetInt(),
-		teamWin = TF2.State() == TF2.STATE.TEAM_WIN,
+		teamWin = WETSAND.State() == WETSAND.STATE.TEAM_WIN,
 		now = CurTime(),
 	}
 end
@@ -52,14 +52,14 @@ end
 local function AssociatedTeam(point)
 	local ent = point:AssociatedEntity()
 	if not IsValid(ent) or ent:GetClass() ~= "team_control_point" then return nil end
-	return TF2.CapTeam(ent)
+	return WETSAND.CapTeam(ent)
 end
 
 local function Describe(ent)
 	local kind = Kind(ent)
 	if kind == "player" then
 		local st = observing[ent]
-		return { id = ent, kind = kind, team = ent:Team(), alive = TF2.IsAliveInGame(ent), deathTime = st and st.deathTime }
+		return { id = ent, kind = kind, team = ent:Team(), alive = WETSAND.IsAliveInGame(ent), deathTime = st and st.deathTime }
 	elseif kind == "point" then
 		return { id = ent, kind = kind, team = ent:TeamNum(), enabled = ent:IsEnabled(), associatedTeam = AssociatedTeam(ent), welcome = ent:IsDefaultWelcome() }
 	end
@@ -178,7 +178,7 @@ local function Resolve(ply, st)
 		return false
 	end
 	local old = st.target
-	if IsValid(old) and old:GetClass() == "func_tracktrain" and TF2.State() == TF2.STATE.TEAM_WIN then
+	if IsValid(old) and old:GetClass() == "func_tracktrain" and WETSAND.State() == WETSAND.STATE.TEAM_WIN then
 		st.target = PointNearest(ply, old:GetPos())
 	else
 		st.target = nil
@@ -248,7 +248,7 @@ end
 
 -- Put a player straight into observing: the spectator team, or a dead player
 -- skipping the deathcam. Weapons go, as in GM:PlayerSpawnAsSpectator.
-function TF2.StartObserving(ply)
+function WETSAND.StartObserving(ply)
 	ply:StripWeapons()
 	local st = { aborted = false }
 	st.target = InitialTarget(ply)
@@ -258,7 +258,7 @@ end
 -- Leave observer mode. The engine needs the player spawned (or killed)
 -- afterwards to be solid and damageable again (Player:UnSpectate's caveat);
 -- GM:PlayerSpawn also unspectates, so a respawn alone is enough.
-function TF2.StopObserving(ply)
+function WETSAND.StopObserving(ply)
 	local st = observing[ply]
 	observing[ply] = nil
 	if st and st.wasAtPoint then ply:SetFOV(0, 0) end
@@ -266,8 +266,8 @@ function TF2.StopObserving(ply)
 end
 
 -- CTFGameRulesProxy::InputSetRequiredObserverTarget: "" clears it.
-function TF2.SetRequiredObserverTarget(name)
-	required = TF2.FindByName(name)
+function WETSAND.SetRequiredObserverTarget(name)
+	required = WETSAND.FindByName(name)
 end
 
 -- Death --------------------------------------------------------------------------
@@ -287,11 +287,11 @@ end)
 
 -- PostPlayerDeath follows every death, KillSilent included.
 hook.Add("PostPlayerDeath", "tf2.spectate", function(ply)
-	if not TF2.Active() then return end
+	if not WETSAND.Active() then return end
 	local killer = killers[ply]
 	killers[ply] = nil
 	if IsSpectator(ply) then
-		TF2.StartObserving(ply)
+		WETSAND.StartObserving(ply)
 		return
 	end
 	Begin(ply, { deathTime = CurTime(), killer = killer, aborted = false })
@@ -300,14 +300,14 @@ end)
 -- Spawning ends observing. A spectator is put straight back (tf_gamerules
 -- spawns everyone at round start), skipping Sandbox's loadout.
 hook.Add("PlayerSpawn", "tf2.spectate", function(ply)
-	if not TF2.Active() then return end
+	if not WETSAND.Active() then return end
 	if IsSpectator(ply) then
-		TF2.StartObserving(ply)
+		WETSAND.StartObserving(ply)
 		return true
 	end
 	-- Base's PlayerSpawn unspectates too, but a hook of another addon that
-	-- returns first would skip it; TF2.IsAliveInGame needs OBS_MODE_NONE.
-	TF2.StopObserving(ply)
+	-- returns first would skip it; WETSAND.IsAliveInGame needs OBS_MODE_NONE.
+	WETSAND.StopObserving(ply)
 end)
 
 -- Input (spec_next / spec_prev / spec_mode) --------------------------------------

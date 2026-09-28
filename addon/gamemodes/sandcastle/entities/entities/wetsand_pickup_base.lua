@@ -16,7 +16,7 @@ ENT.Kind = "health"
 
 if CLIENT then return end
 
-local P = TF2.PlayerRules
+local P = WETSAND.PlayerRules
 
 local SOUNDS = {
 	health = "HealthKit.Touch",
@@ -92,19 +92,19 @@ end
 
 -- CTFPowerup::ValidTouch
 function ENT:ValidTouch(ply)
-	if self.disabled or self.respawning or not TF2.IsAliveInGame(ply) then return false end
+	if self.disabled or self.respawning or not WETSAND.IsAliveInGame(ply) then return false end
 	return self.team == 0 or ply:Team() == self.team
 end
 
 -- CHealthKit::MyTouch / CAmmoPack::MyTouch: whether the pickup was used.
 function ENT:MyTouch(ply)
 	local ratio = P.PACK_RATIO[self.Size]
-	if self.Kind == "ammo" then return TF2.GiveAmmoFraction(ply, ratio) end
+	if self.Kind == "ammo" then return WETSAND.GiveAmmoFraction(ply, ratio) end
 	local given = P.HealthKitHeal(ply:Health(), ply:GetMaxHealth(), ratio)
 	local burning = ply:IsOnFire()
 	if not P.HealthKitTaken(given, burning) then return false end
 	ply:SetHealth(ply:Health() + given)
-	TF2.RemoveCondition(ply, P.COND.BURNING)
+	WETSAND.RemoveCondition(ply, P.COND.BURNING)
 	ply:Extinguish()
 	return true
 end
@@ -112,7 +112,7 @@ end
 -- CItem::ItemTouch
 function ENT:Touch(ply)
 	if not self:ValidTouch(ply) or not self:MyTouch(ply) then return end
-	TF2.PlaySoundTo(ply, self, SOUNDS[self.Kind])
+	WETSAND.PlaySoundTo(ply, self, SOUNDS[self.Kind])
 	self:TriggerOutput("OnPlayerTouch", ply)
 	self:Respawn()
 end

@@ -16,9 +16,9 @@ end
 function ENT:Think()
 	self:NextThink(CurTime() + 0.1)
 	if not self.enabled then return true end
-	local now, state, winner = CurTime(), TF2.State(), GetGlobal2Int("tf2.winner", 0)
-	for _, ply in ipairs(TF2.PlayersInside(self)) do
-		if now >= (ply.tf2NextRegen or 0) and TF2.TeamRules.RegenerateAllowed(self.team, ply:Team(), state, winner) then
+	local now, state, winner = CurTime(), WETSAND.State(), GetGlobal2Int("tf2.winner", 0)
+	for _, ply in ipairs(WETSAND.PlayersInside(self)) do
+		if now >= (ply.tf2NextRegen or 0) and WETSAND.TeamRules.RegenerateAllowed(self.team, ply:Team(), state, winner) then
 			self:Regenerate(ply)
 		end
 	end
@@ -27,10 +27,10 @@ end
 
 -- CRegenerateZone::Regenerate
 function ENT:Regenerate(ply)
-	TF2.RegeneratePlayer(ply)
+	WETSAND.RegeneratePlayer(ply)
 	ply.tf2NextRegen = CurTime() + NEXT_USE_TIME
-	TF2.PlaySoundTo(ply, ply, SOUND)
-	local prop = TF2.FindByName(self.associatedModel)
+	WETSAND.PlaySoundTo(ply, ply, SOUND)
+	local prop = WETSAND.FindByName(self.associatedModel)
 	if IsValid(prop) then
 		prop:Fire("SetAnimation", "open")
 		prop:Fire("SetAnimation", "close", NEXT_USE_TIME - 1.0)

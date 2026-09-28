@@ -55,7 +55,7 @@ end
 function ENT:PointStates()
 	local states = {}
 	for i, p in ipairs(self:Points()) do
-		states[i] = { owner = TF2.CapTeam(p), group = TF2.PointGroup(p) }
+		states[i] = { owner = WETSAND.CapTeam(p), group = WETSAND.PointGroup(p) }
 	end
 	return states
 end
@@ -63,15 +63,15 @@ end
 -- CTeamControlPointRound::IsPlayable. StartDisabled is not consulted, as in
 -- the SDK.
 function ENT:IsPlayable()
-	return TF2.RoundsLib.RoundPlayable(self.restrictTeam, self:PointStates())
+	return WETSAND.RoundsLib.RoundPlayable(self.restrictTeam, self:PointStates())
 end
 
 -- CTeamControlPointRound::CheckWinConditions: the winner (firing
 -- OnWonByTeam1/2), or nil.
 function ENT:CheckWinConditions()
-	local winner = TF2.RoundsLib.RoundWinner(self.restrictTeam, self:PointStates())
+	local winner = WETSAND.RoundsLib.RoundWinner(self.restrictTeam, self:PointStates())
 	if winner then
-		self:TriggerOutput(winner == TF2.TEAM_RED and "OnWonByTeam1" or "OnWonByTeam2", self)
+		self:TriggerOutput(winner == WETSAND.TEAM_RED and "OnWonByTeam1" or "OnWonByTeam2", self)
 	end
 	return winner
 end

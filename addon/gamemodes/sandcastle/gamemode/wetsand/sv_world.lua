@@ -6,10 +6,10 @@ util.AddNetworkString("tf2.sound")
 
 -- CTeamplayRoundBasedRules::BroadcastSound: a game sound every player of a
 -- team hears as their own (announcer lines, win/lose music). Team 0 is everyone.
-function TF2.BroadcastSound(team, name)
+function WETSAND.BroadcastSound(team, name)
 	local recipients = {}
 	for _, ply in ipairs(player.GetAll()) do
-		if team == TF2.TEAM_UNASSIGNED or TF2.TeamOf(ply) == team then recipients[#recipients + 1] = ply end
+		if team == WETSAND.TEAM_UNASSIGNED or WETSAND.TeamOf(ply) == team then recipients[#recipients + 1] = ply end
 	end
 	if #recipients == 0 then return end
 	net.Start("tf2.sound")
@@ -19,7 +19,7 @@ end
 
 -- A game sound from an entity that only one player hears
 -- (CSingleUserRecipientFilter): pickup and resupply sounds.
-function TF2.PlaySoundTo(ply, ent, name)
+function WETSAND.PlaySoundTo(ply, ent, name)
 	local filter = RecipientFilter()
 	filter:AddPlayer(ply)
 	ent:EmitSound(name, 75, 100, 1, CHAN_AUTO, 0, 0, filter)
@@ -33,7 +33,7 @@ end)
 -- Keyvalues of engine entities we read but do not implement. GMod exposes no
 -- getter for a path_track's next node or a teamspawn's team, so they are
 -- recorded as the map sets them.
-TF2.KV = TF2.KV or setmetatable({}, { __mode = "k" })
+WETSAND.KV = WETSAND.KV or setmetatable({}, { __mode = "k" })
 
 local RECORDED = {
 	path_track = true,
@@ -44,30 +44,30 @@ local RECORDED = {
 -- Outputs are kept in map order in kv.outputs, since an output key may repeat.
 hook.Add("EntityKeyValue", "tf2.record", function(ent, key, value)
 	if not RECORDED[ent:GetClass()] then return end
-	local kv = TF2.KV[ent]
+	local kv = WETSAND.KV[ent]
 	if not kv then
 		kv = { outputs = {} }
-		TF2.KV[ent] = kv
+		WETSAND.KV[ent] = kv
 	end
 	if string.sub(key, 1, 2) == "On" then
-		kv.outputs[#kv.outputs + 1] = TF2.ParseOutput(key, value)
+		kv.outputs[#kv.outputs + 1] = WETSAND.ParseOutput(key, value)
 	else
 		kv[string.lower(key)] = value
 	end
 end)
 
-function TF2.KeyValues(ent)
-	return TF2.KV[ent] or { outputs = {} }
+function WETSAND.KeyValues(ent)
+	return WETSAND.KV[ent] or { outputs = {} }
 end
 
-function TF2.FindByName(name)
+function WETSAND.FindByName(name)
 	if not name or name == "" then return NULL end
 	return ents.FindByName(name)[1] or NULL
 end
 
 -- An output connection as Hammer writes it: target,input,param,delay,times
 -- (newer compilers separate the fields with ESC instead of commas).
-function TF2.ParseOutput(name, value)
+function WETSAND.ParseOutput(name, value)
 	local sep = string.find(value, "\27", 1, true) and "\27" or ","
 	local f = string.Explode(sep, value)
 	return {
@@ -90,8 +90,8 @@ local function OutputTargets(o, caller, activator)
 end
 
 -- Fire the named output of an engine entity whose outputs we recorded.
-function TF2.FireOutput(caller, name, activator)
-	for _, o in ipairs(TF2.KeyValues(caller).outputs) do
+function WETSAND.FireOutput(caller, name, activator)
+	for _, o in ipairs(WETSAND.KeyValues(caller).outputs) do
 		if o.name == name and (o.times < 0 or o.fired < o.times) then
 			o.fired = o.fired + 1
 			for _, target in ipairs(OutputTargets(o, caller, activator)) do
@@ -103,14 +103,14 @@ function TF2.FireOutput(caller, name, activator)
 	end
 end
 
-function TF2.Announce(text, team)
+function WETSAND.Announce(text, team)
 	net.Start("tf2.announce")
 	net.WriteString(text)
 	net.WriteUInt(team or 0, 2)
 	net.Broadcast()
 end
 
-function TF2.IsAliveInGame(ply)
+function WETSAND.IsAliveInGame(ply)
 	return IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply:GetObserverMode() == OBS_MODE_NONE
 end
 
@@ -118,12 +118,12 @@ end
 -- space so a volume parented to the moving cart turns with it. Brush volumes
 -- are treated as their bounding box.
 local HULL = Vector(16, 16, 36)
-function TF2.PlayersInside(ent)
+function WETSAND.PlayersInside(ent)
 	local inside = {}
 	if not IsValid(ent) then return inside end
 	local mins, maxs = ent:OBBMins() - HULL, ent:OBBMaxs() + HULL
 	for _, ply in ipairs(player.GetAll()) do
-		if TF2.IsAliveInGame(ply) then
+		if WETSAND.IsAliveInGame(ply) then
 			local p = ent:WorldToLocal(ply:WorldSpaceCenter())
 			if p:WithinAABox(mins, maxs) then
 				inside[#inside + 1] = ply
@@ -143,13 +143,13 @@ end
 
 -- Refill every weapon's primary reserve by a fraction of its ceiling.
 -- Returns whether anything was given.
-function TF2.GiveAmmoFraction(ply, fraction)
+function WETSAND.GiveAmmoFraction(ply, fraction)
 	local gave = false
 	for _, wep in ipairs(ply:GetWeapons()) do
 		local ammoType = wep:GetPrimaryAmmoType()
 		if ammoType >= 0 then
 			local have = ply:GetAmmoCount(ammoType)
-			local after = TF2.PlayerRules.AmmoAfterPack(have, AmmoCeiling(wep, ammoType), fraction)
+			local after = WETSAND.PlayerRules.AmmoAfterPack(have, AmmoCeiling(wep, ammoType), fraction)
 			if after > have then
 				ply:SetAmmo(after, ammoType)
 				gave = true
@@ -159,7 +159,7 @@ function TF2.GiveAmmoFraction(ply, fraction)
 	return gave
 end
 
-function TF2.HealFraction(ply, fraction)
+function WETSAND.HealFraction(ply, fraction)
 	local max = ply:GetMaxHealth()
 	if ply:Health() >= max then return false end
 	ply:SetHealth(math.min(max, ply:Health() + math.ceil(max * fraction)))
@@ -171,7 +171,7 @@ end
 -- to know which nodes are disabled, so note it and let the input through.
 hook.Add("AcceptInput", "tf2.pathtrack", function(ent, input)
 	if ent:GetClass() ~= "path_track" then return end
-	local kv = TF2.KV[ent]
+	local kv = WETSAND.KV[ent]
 	if not kv then return end
 	input = string.lower(input)
 	if input == "disablepath" then

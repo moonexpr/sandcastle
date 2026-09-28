@@ -52,7 +52,7 @@ end
 function ENT:AssociatedEntity()
 	local name = self:Key("associated_team_entity")
 	if not name then return NULL end
-	if not IsValid(self.associated) then self.associated = TF2.FindByName(name) end
+	if not IsValid(self.associated) then self.associated = WETSAND.FindByName(name) end
 	return self.associated
 end
 

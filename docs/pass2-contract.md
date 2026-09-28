@@ -32,9 +32,9 @@ New modules need no wiring: drop a correctly prefixed file into gamemode/wetsand
   `filter` plugs into engine triggers via `ENT:PassesFilter(trigger, ent)`.
 - GMod's engine already owns `team_control_point`, `info_player_teamspawn`,
   `path_track`, `func_tracktrain`: a Lua class of the same name never spawns. Their
-  keyvalues are recorded by the EntityKeyValue hook in sv_world.lua (`TF2.KeyValues(ent)`,
+  keyvalues are recorded by the EntityKeyValue hook in sv_world.lua (`WETSAND.KeyValues(ent)`,
   outputs as an ordered list in `.outputs`), inputs are intercepted with the `AcceptInput`
-  hook, outputs fired with `TF2.FireOutput(ent, name, activator)`.
+  hook, outputs fired with `WETSAND.FireOutput(ent, name, activator)`.
 - `team_control_point` state lives in sv_controlpoint.lua (owner, lock, model).
 - `func_tracktrain` accepts `SetSpeedDirAccel` and `SetSpeedForwardModifier`; its
   `m_flSpeed` is readable with `GetInternalVariable`. path_track `OnPass` can be
@@ -42,8 +42,8 @@ New modules need no wiring: drop a correctly prefixed file into gamemode/wetsand
 - A brush entity's `OBBMins/OBBMaxs` after `SetModel("*N")` are brush-space; test
   containment with `ent:WorldToLocal(pos)` (works when parented to the moving cart).
 - TF2's soundscripts are loaded (sh_soundscripts.lua), so `ply:EmitSound("Announcer.X")`,
-  `TF2.BroadcastSound(team, "Game.X")` and engine entities' named sounds all resolve.
-- Team numbers are TF2's: 0 unassigned, 1 spectator, 2 RED, 3 BLU. `TF2.TeamOf(ply)`
+  `WETSAND.BroadcastSound(team, "Game.X")` and engine entities' named sounds all resolve.
+- Team numbers are TF2's: 0 unassigned, 1 spectator, 2 RED, 3 BLU. `WETSAND.TeamOf(ply)`
   returns 2/3 or 0 for anything else (other addons use other teams, e.g. 21 "Runner").
 - Neither Sandbox nor base defines `GM:StartCommand` or server `GM:PostPlayerDeath`;
   do not call BaseClass for those.
@@ -62,25 +62,25 @@ New modules need no wiring: drop a correctly prefixed file into gamemode/wetsand
 
 Existing, keep signatures stable:
 
-- `TF2.TeamOf(ent)`, `TF2.EnemyOf(team)`, `TF2.Active()`, `TF2.State()`, `TF2.STATE.*`, `TF2.TeamName`, `TF2.TeamColor`
-- `TF2.Rules` (the tf_gamerules entity): `:StateGet()`, `:InSetup()`, `:PointsMayBeCaptured()`,
+- `WETSAND.TeamOf(ent)`, `WETSAND.EnemyOf(team)`, `WETSAND.Active()`, `WETSAND.State()`, `WETSAND.STATE.*`, `WETSAND.TeamName`, `WETSAND.TeamColor`
+- `WETSAND.Rules` (the tf_gamerules entity): `:StateGet()`, `:InSetup()`, `:PointsMayBeCaptured()`,
   `:SetWinningTeam(team, reason, forceMapReset, switchTeams)`, `:OnPlayerDeath(ply)`
-- `TF2.CapTeam(point)`, `TF2.SetPointOwner(point, team, activator)`, `TF2.PointLocked(point)`, `TF2.PointIndex(point)`, `TF2.ApplyPointModel(point)`
-- `TF2.KeyValues(ent)`, `TF2.FireOutput(ent, name, activator)`, `TF2.ParseOutput(name, value)`, `TF2.FindByName(name)`
-- `TF2.PlayersInside(ent)`, `TF2.IsAliveInGame(ply)`, `TF2.HealFraction(ply, f)`, `TF2.GiveAmmoFraction(ply, f)`
-- `TF2.SpawnPoints(team)`, `TF2.PickSpawn(team)`, `TF2.Announce(text, team)`, `TF2.BroadcastSound(team, name)` (team 0 = everyone)
+- `WETSAND.CapTeam(point)`, `WETSAND.SetPointOwner(point, team, activator)`, `WETSAND.PointLocked(point)`, `WETSAND.PointIndex(point)`, `WETSAND.ApplyPointModel(point)`
+- `WETSAND.KeyValues(ent)`, `WETSAND.FireOutput(ent, name, activator)`, `WETSAND.ParseOutput(name, value)`, `WETSAND.FindByName(name)`
+- `WETSAND.PlayersInside(ent)`, `WETSAND.IsAliveInGame(ply)`, `WETSAND.HealFraction(ply, f)`, `WETSAND.GiveAmmoFraction(ply, f)`
+- `WETSAND.SpawnPoints(team)`, `WETSAND.PickSpawn(team)`, `WETSAND.Announce(text, team)`, `WETSAND.BroadcastSound(team, name)` (team 0 = everyone)
 - hooks: `TF2RoundActive()`, `TF2RoundWin(winner)`, `TF2PointCaptured(point, team)`, client `SandcastleHUDPaint(w, h)`
 
 New, each provided by its owner exactly as named (others may call them):
 
-- **B** `TF2.TeamCanCapPoint(point, team) -> bool`: not locked, team does not own it, previous points owned, point belongs to the current round (if rounds are in use). A's capture areas call it.
-- **B** `TF2.CurrentRound() -> team_control_point_round entity or NULL`; hook `TF2MiniRoundStart(round)` after a mini-round begins (after its spawn changes apply).
-- **B** `TF2.SwitchTeams()`: swap every RED/BLU player (used by switch_teams on win). Implement via `TF2.SetPlayerTeam`.
+- **B** `WETSAND.TeamCanCapPoint(point, team) -> bool`: not locked, team does not own it, previous points owned, point belongs to the current round (if rounds are in use). A's capture areas call it.
+- **B** `WETSAND.CurrentRound() -> team_control_point_round entity or NULL`; hook `TF2MiniRoundStart(round)` after a mini-round begins (after its spawn changes apply).
+- **B** `WETSAND.SwitchTeams()`: swap every RED/BLU player (used by switch_teams on win). Implement via `WETSAND.SetPlayerTeam`.
 - **B** hook `TF2Overtime(active)` when the timer enters/leaves overtime.
-- **C** `TF2.SetPlayerTeam(ply, team)`: the one way to change a player's TF2 team (TF2 semantics: a live player switching teams dies and respawns with the waves; spectator).
-- **C** `TF2.RoundSpawnFilter` is not an API; C decides spawn selection per round from `TF2.CurrentRound()`.
-- **D** `TF2.StartObserving(ply)` / `TF2.StopObserving(ply)`: put a player into / out of observer mode (dead players and the spectator team). C's `TF2.SetPlayerTeam` calls them for team 1.
-- **D** `TF2.SetRequiredObserverTarget(name)` (name, or "" to clear): B's tf_gamerules input SetRequiredObserverTarget calls it.
+- **C** `WETSAND.SetPlayerTeam(ply, team)`: the one way to change a player's TF2 team (TF2 semantics: a live player switching teams dies and respawns with the waves; spectator).
+- **C** `WETSAND.RoundSpawnFilter` is not an API; C decides spawn selection per round from `WETSAND.CurrentRound()`.
+- **D** `WETSAND.StartObserving(ply)` / `WETSAND.StopObserving(ply)`: put a player into / out of observer mode (dead players and the spectator team). C's `WETSAND.SetPlayerTeam` calls them for team 1.
+- **D** `WETSAND.SetRequiredObserverTarget(name)` (name, or "" to clear): B's tf_gamerules input SetRequiredObserverTarget calls it.
 - **A** each watcher entity: `:TimerMayExpire()`, `:IsWatching(train)`, `:SetNumTrainCappers(num, area)` (existing).
 
 ## Networked keys (Global2 vars)

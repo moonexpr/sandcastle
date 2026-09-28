@@ -14,7 +14,7 @@ function ENT:VolumeInit()
 end
 
 function ENT:PassesTriggerFilters(ent)
-	local filter = TF2.FindByName(self:Key("filtername"))
+	local filter = WETSAND.FindByName(self:Key("filtername"))
 	if not (IsValid(filter) and filter.PassesFilter) then return true end
 	return filter:PassesFilter(self, ent)
 end
@@ -30,7 +30,7 @@ function ENT:Think()
 	self:NextThink(CurTime() + THINK_INTERVAL)
 	if not self.enabled then return true end
 	local inside = {}
-	for _, ply in ipairs(TF2.PlayersInside(self)) do inside[ply] = true end
+	for _, ply in ipairs(WETSAND.PlayersInside(self)) do inside[ply] = true end
 	for ply in pairs(self.touching) do
 		if not inside[ply] then
 			self.touching[ply] = nil

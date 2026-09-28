@@ -29,14 +29,14 @@ end
 -- Team numbers are compared raw, as TF2 does: a player on another addon's
 -- team matches neither RED nor BLU.
 function ENT:PassesFilter(trigger, ent)
-	return TF2.TeamRules.FilterPasses(self.team, self.negated, ent:Team(), TF2.State(), GetGlobal2Int("tf2.winner", 0))
+	return WETSAND.TeamRules.FilterPasses(self.team, self.negated, ent:Team(), WETSAND.State(), GetGlobal2Int("tf2.winner", 0))
 end
 
 -- CFilterTFTeam::InputRoundActivate
 function ENT:RoundActivate()
 	if not self.pointName or self.pointName == "" then return end
-	local point = TF2.FindByName(self.pointName)
-	if IsValid(point) then self.team = TF2.CapTeam(point) end
+	local point = WETSAND.FindByName(self.pointName)
+	if IsValid(point) then self.team = WETSAND.CapTeam(point) end
 end
 
 local INPUTS = {

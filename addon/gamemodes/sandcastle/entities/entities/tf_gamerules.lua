@@ -6,7 +6,7 @@
 ENT.Type = "point"
 ENT.Base = "base_point"
 
-local S = TF2.STATE
+local S = WETSAND.STATE
 
 -- TF2's own convars, as teamplayroundbased_gamerules.cpp and
 -- multiplay_gamerules.cpp define them. GMod's engine may already define some
@@ -37,14 +37,14 @@ local OPTIMAL_TEAM_SIZE = 8
 
 local TIMELIMIT_TIMER_NAME = "zz_teamplay_timelimit_timer"
 
-local function Lib() return TF2.RoundsLib end
+local function Lib() return WETSAND.RoundsLib end
 
 function ENT:KeyValue(key, value)
 	if string.sub(key, 1, 2) == "On" or string.sub(key, 1, 4) == "Team" then self:StoreOutput(key, value) end
 end
 
 function ENT:Initialize()
-	TF2.Rules = self
+	WETSAND.Rules = self
 	SetGlobal2Bool("tf2.active", true)
 	self.waveTime = { [2] = -1, [3] = -1 }
 	self.originalWaveTime = { [2] = -1, [3] = -1 }
@@ -56,7 +56,7 @@ function ENT:Initialize()
 	self.mapFresh = true
 	self.switchTeams = false
 	self.previousRounds = {}
-	self.winningTeam = TF2.TEAM_UNASSIGNED
+	self.winningTeam = WETSAND.TEAM_UNASSIGNED
 	self.allowStalemateAtTimelimit = false
 	self.mapResetTime = CurTime()
 	self.nextPeriodic = 0
@@ -65,8 +65,8 @@ function ENT:Initialize()
 end
 
 function ENT:OnRemove()
-	if TF2.Rules == self then
-		TF2.Rules = nil
+	if WETSAND.Rules == self then
+		WETSAND.Rules = nil
 		SetGlobal2Bool("tf2.active", false)
 	end
 end
@@ -127,7 +127,7 @@ end
 function ENT:TeamPlayers(team)
 	local players = {}
 	for _, ply in ipairs(player.GetAll()) do
-		if TF2.TeamOf(ply) == team then players[#players + 1] = ply end
+		if WETSAND.TeamOf(ply) == team then players[#players + 1] = ply end
 	end
 	return players
 end
@@ -141,7 +141,7 @@ end
 -- BHavePlayers: someone ready and on RED or BLU.
 function ENT:HavePlayers()
 	for _, ply in ipairs(player.GetAll()) do
-		if Ready(ply) and TF2.TeamOf(ply) ~= TF2.TEAM_UNASSIGNED then return true end
+		if Ready(ply) and WETSAND.TeamOf(ply) ~= WETSAND.TEAM_UNASSIGNED then return true end
 	end
 	return false
 end
@@ -149,7 +149,7 @@ end
 -- RespawnPlayers(true): everyone but spectators, now.
 function ENT:RespawnPlayers()
 	for _, ply in ipairs(player.GetAll()) do
-		if ply:Team() ~= TF2.TEAM_SPECTATOR then ply:Spawn() end
+		if ply:Team() ~= WETSAND.TEAM_SPECTATOR then ply:Spawn() end
 	end
 end
 
@@ -165,7 +165,7 @@ function ENT:CheckTeamCounts()
 end
 
 function ENT:Scores()
-	return { [2] = team.GetScore(TF2.TEAM_RED), [3] = team.GetScore(TF2.TEAM_BLUE) }
+	return { [2] = team.GetScore(WETSAND.TEAM_RED), [3] = team.GetScore(WETSAND.TEAM_BLUE) }
 end
 
 -- PREGAME --------------------------------------------------------------------------------
@@ -177,7 +177,7 @@ end
 -- PREROUND -------------------------------------------------------------------------------
 
 function ENT:StateEnter_PREROUND()
-	TF2.BalanceTeams(false)
+	WETSAND.BalanceTeams(false)
 	self:RoundRespawn()
 	self.transitionAt = CurTime() + PREROUND_SECONDS * enableroundwaittime:GetFloat()
 	SetGlobal2Float("tf2.preroundEnd", self.transitionAt)
@@ -223,7 +223,7 @@ function ENT:CheckTimelimitStalemate()
 	if timelimit:GetInt() <= 0 or self:TimeLeft() > 0 then return end
 	if not (self.allowStalemateAtTimelimit or matchEndAtTimelimit:GetBool()) then return end
 	local winner = Lib().TimelimitWinner(self:Scores())
-	if winner == TF2.TEAM_UNASSIGNED then
+	if winner == WETSAND.TEAM_UNASSIGNED then
 		self.changelevelAfterStalemate = true
 		self:SetStalemate(Lib().STALEMATE.SERVER_TIMELIMIT, self.forceMapReset)
 	else
@@ -231,7 +231,7 @@ function ENT:CheckTimelimitStalemate()
 	end
 end
 
--- TEAM_WIN (the humiliation: the losers cannot attack, see TF2.RestrictCommand) --------
+-- TEAM_WIN (the humiliation: the losers cannot attack, see WETSAND.RestrictCommand) --------
 
 function ENT:StateEnter_TEAM_WIN()
 	if self.forceMapReset then self.roundsPlayed = self.roundsPlayed + 1 end
@@ -248,7 +248,7 @@ end
 
 -- CTFGameRules::PreviousRoundEnd: the mini-round's OnEnd.
 function ENT:PreviousRoundEnd()
-	local master = TF2.Master()
+	local master = WETSAND.Master()
 	if IsValid(master) then master:FireRoundEndOutput() end
 end
 
@@ -273,7 +273,7 @@ end
 
 function ENT:TeamLife()
 	local teams = {}
-	for team = TF2.TEAM_RED, TF2.TEAM_BLUE do
+	for team = WETSAND.TEAM_RED, WETSAND.TEAM_BLUE do
 		local players, alive = self:TeamPlayers(team), 0
 		for _, ply in ipairs(players) do
 			if ply:Alive() then alive = alive + 1 end
@@ -292,7 +292,7 @@ function ENT:StateThink_STALEMATE()
 	local winner, allDead = Lib().StalemateOutcome(self:TeamLife())
 	if winner then
 		-- Without a full reset the survivors take the round's points.
-		local master = TF2.Master()
+		local master = WETSAND.Master()
 		if not self.forceMapReset and IsValid(master) then
 			master:SetWinnerAndForceCaps(winner)
 		else
@@ -300,9 +300,9 @@ function ENT:StateThink_STALEMATE()
 		end
 		return
 	end
-	local timerOut = IsValid(self.stalemateTimer) and TF2.TimerMayExpire() and self.stalemateTimer:TimeRemaining() <= 0
+	local timerOut = IsValid(self.stalemateTimer) and WETSAND.TimerMayExpire() and self.stalemateTimer:TimeRemaining() <= 0
 	if allDead or timerOut then
-		self:SetWinningTeam(TF2.TEAM_UNASSIGNED, Lib().WINREASON.STALEMATE, not TF2.PlayingMiniRounds(), false)
+		self:SetWinningTeam(WETSAND.TEAM_UNASSIGNED, Lib().WINREASON.STALEMATE, not WETSAND.PlayingMiniRounds(), false)
 	end
 end
 
@@ -375,7 +375,7 @@ function ENT:CheckMaxRounds()
 end
 
 function ENT:CheckTimeLimit()
-	local master = TF2.Master()
+	local master = WETSAND.Master()
 	local mini = IsValid(master) and master:PlayingMiniRounds()
 	local canChange = Lib().CanChangeLevelForTimeLimit(self.forceMapReset, mini,
 		mini and master.playAllRounds, mini and master:NumPlayable() or 0)
@@ -393,19 +393,19 @@ end
 -- Round control ------------------------------------------------------------------------------
 
 function ENT:InSetup()
-	return TF2.InSetup()
+	return WETSAND.InSetup()
 end
 
 function ENT:SetInSetup(inSetup)
-	TF2.SetSetup(inSetup)
+	WETSAND.SetSetup(inSetup)
 end
 
 function ENT:SetOvertime(overtime)
-	TF2.SetOvertime(overtime)
+	WETSAND.SetOvertime(overtime)
 end
 
 function ENT:PointsMayBeCaptured()
-	return (self.state == S.RND_RUNNING or self.state == S.STALEMATE) and not TF2.InSetup()
+	return (self.state == S.RND_RUNNING or self.state == S.STALEMATE) and not WETSAND.InSetup()
 end
 
 function ENT:AddPlayedRound(name)
@@ -435,12 +435,12 @@ function ENT:RoundRespawn()
 		if not self.mapFresh then game.CleanUpMap(false, { "tf_gamerules" }) end
 		self.mapFresh = false
 		self.previousRounds = {}
-		TF2.ActivateTimers()
+		WETSAND.ActivateTimers()
 		if timelimit:GetInt() > 0 and self:TimeLeft() > 0 and not self:MapHasActiveTimer() then
 			self:CreateTimeLimitTimer()
 		end
 	end
-	for t = TF2.TEAM_RED, TF2.TEAM_BLUE do
+	for t = WETSAND.TEAM_RED, WETSAND.TEAM_BLUE do
 		if self.originalWaveTime[t] >= 0 then self.waveTime[t] = self.originalWaveTime[t] end
 	end
 	self:SetupOnRoundStart()
@@ -454,37 +454,37 @@ end
 -- CTFGameRules::SetupOnRoundStart: every entity hears RoundSpawn, then
 -- RoundActivate; the master picks the mini-round on RoundActivate.
 function ENT:SetupOnRoundStart()
-	TF2.SetOvertime(false)
+	WETSAND.SetOvertime(false)
 	for _, t in ipairs(ents.FindByClass("team_round_timer")) do t:RoundSpawn() end
 	for _, m in ipairs(ents.FindByClass("team_control_point_master")) do m:RoundSpawn() end
 	hook.Run("TF2RoundSpawn")
-	for _, p in ipairs(ents.FindByClass("team_control_point")) do TF2.PointRoundActivate(p) end
+	for _, p in ipairs(ents.FindByClass("team_control_point")) do WETSAND.PointRoundActivate(p) end
 	for _, m in ipairs(ents.FindByClass("team_control_point_master")) do m:RoundActivate() end
 	hook.Run("TF2RoundActivate")
 end
 
 -- CTFGameRules::HandleSwitchTeams: the players and their scores.
 function ENT:HandleSwitchTeams()
-	TF2.SwitchTeams()
-	TF2.SwapTeamScores()
+	WETSAND.SwitchTeams()
+	WETSAND.SwapTeamScores()
 end
 
 -- CTeamplayRoundBasedRules::PlayWinSong: each side hears its own result.
 -- (The teamless would hear Game.TeamWin2/3, which no soundscript defines.)
 local function PlayWinSong(winner)
-	if winner == TF2.TEAM_UNASSIGNED then
-		TF2.BroadcastSound(TF2.TEAM_UNASSIGNED, "Game.Stalemate")
+	if winner == WETSAND.TEAM_UNASSIGNED then
+		WETSAND.BroadcastSound(WETSAND.TEAM_UNASSIGNED, "Game.Stalemate")
 		return
 	end
-	TF2.BroadcastSound(winner, "Game.YourTeamWon")
-	TF2.BroadcastSound(TF2.EnemyOf(winner), "Game.YourTeamLost")
+	WETSAND.BroadcastSound(winner, "Game.YourTeamWon")
+	WETSAND.BroadcastSound(WETSAND.EnemyOf(winner), "Game.YourTeamLost")
 end
 
 -- What the win panel shows (SendWinPanelInfo).
 function ENT:PublishWin(team, reason, forceMapReset)
-	local master = TF2.Master()
+	local master = WETSAND.Master()
 	local remaining = 0
-	if team ~= TF2.TEAM_UNASSIGNED and IsValid(master) then remaining = master:RoundsRemaining(team) end
+	if team ~= WETSAND.TEAM_UNASSIGNED and IsValid(master) then remaining = master:RoundsRemaining(team) end
 	SetGlobal2Int("tf2.winner", team)
 	SetGlobal2Int("tf2.round.winreason", reason)
 	SetGlobal2Bool("tf2.round.fullround", forceMapReset)
@@ -500,28 +500,28 @@ function ENT:SetWinningTeam(winner, reason, forceMapReset, switchTeams, dontAddS
 	self.winningTeam = winner
 	self.winReason = reason
 	local reward = Lib().ShouldRewardTeam(forceMapReset, timelimit:GetInt(), self:TimeLeft(), dontAddScore == true)
-	if reward and winner ~= TF2.TEAM_UNASSIGNED and TF2.ScorePerRound() then
+	if reward and winner ~= WETSAND.TEAM_UNASSIGNED and WETSAND.ScorePerRound() then
 		team.AddScore(winner, 1)
 	end
 	self:PublishWin(winner, reason, forceMapReset)
 	self:StateTransition(S.TEAM_WIN)
 	PlayWinSong(winner)
-	if winner == TF2.TEAM_RED then self:TriggerOutput("OnWonByTeam1", self) end
-	if winner == TF2.TEAM_BLUE then self:TriggerOutput("OnWonByTeam2", self) end
+	if winner == WETSAND.TEAM_RED then self:TriggerOutput("OnWonByTeam1", self) end
+	if winner == WETSAND.TEAM_BLUE then self:TriggerOutput("OnWonByTeam2", self) end
 end
 
 -- CTeamplayRoundBasedRules::SetStalemate: sudden death when
 -- mp_stalemate_enable is on, otherwise a drawn round.
 function ENT:SetStalemate(reason, forceMapReset, switchTeams)
 	if not stalemateEnable:GetBool() then
-		self:SetWinningTeam(TF2.TEAM_UNASSIGNED, Lib().WINREASON.STALEMATE, forceMapReset, switchTeams)
+		self:SetWinningTeam(WETSAND.TEAM_UNASSIGNED, Lib().WINREASON.STALEMATE, forceMapReset, switchTeams)
 		return
 	end
 	if self.state == S.STALEMATE then return end
 	self.forceMapReset = forceMapReset ~= false
-	self.winningTeam = TF2.TEAM_UNASSIGNED
+	self.winningTeam = WETSAND.TEAM_UNASSIGNED
 	SetGlobal2Int("tf2.round.stalematereason", reason)
-	TF2.BroadcastSound(TF2.TEAM_UNASSIGNED, "Game.SuddenDeath")
+	WETSAND.BroadcastSound(WETSAND.TEAM_UNASSIGNED, "Game.SuddenDeath")
 	self:StateTransition(S.STALEMATE)
 end
 
@@ -542,13 +542,13 @@ function ENT:GetRespawnWaveMaxLength(team, scaleWithNumPlayers)
 end
 
 function ENT:ShouldRespawnQuickly(ply)
-	return TF2.InSetup()
+	return WETSAND.InSetup()
 end
 
 function ENT:GetMinTimeWhenPlayerMaySpawn(ply)
 	local delay = DEATH_ANIM_LENGTH
 	if not self:ShouldRespawnQuickly(ply) then
-		delay = delay + self:GetRespawnWaveMaxLength(TF2.TeamOf(ply), false)
+		delay = delay + self:GetRespawnWaveMaxLength(WETSAND.TeamOf(ply), false)
 	end
 	return (ply.tf2DeathTime or 0) + delay
 end
@@ -572,7 +572,7 @@ function ENT:OnPlayerDeath(ply)
 		ply:SetNW2Float("tf2.respawnAt", 0)
 		return
 	end
-	ply:SetNW2Float("tf2.respawnAt", self:GetNextRespawnWave(TF2.TeamOf(ply), ply))
+	ply:SetNW2Float("tf2.respawnAt", self:GetNextRespawnWave(WETSAND.TeamOf(ply), ply))
 end
 
 function ENT:RespawnTeam(team)
@@ -586,7 +586,7 @@ end
 
 function ENT:CheckRespawnWaves()
 	local now = CurTime()
-	for team = TF2.TEAM_RED, TF2.TEAM_BLUE do
+	for team = WETSAND.TEAM_RED, WETSAND.TEAM_BLUE do
 		if self.nextWave[team] == 0 or self.nextWave[team] <= now then
 			self:RespawnTeam(team)
 			local length = self:GetRespawnWaveMaxLength(team, true)
@@ -638,18 +638,18 @@ local INPUTS = {
 	setblueteamgoalstring = GoalSetter(3),
 	setredteamrole = RoleSetter(2),
 	setblueteamrole = RoleSetter(3),
-	addredteamscore = function(self, v) team.AddScore(TF2.TEAM_RED, tonumber(v) or 0) end,
-	addblueteamscore = function(self, v) team.AddScore(TF2.TEAM_BLUE, tonumber(v) or 0) end,
-	setrequiredobservertarget = function(self, v) TF2.SetRequiredObserverTarget(tostring(v or "")) end,
+	addredteamscore = function(self, v) team.AddScore(WETSAND.TEAM_RED, tonumber(v) or 0) end,
+	addblueteamscore = function(self, v) team.AddScore(WETSAND.TEAM_BLUE, tonumber(v) or 0) end,
+	setrequiredobservertarget = function(self, v) WETSAND.SetRequiredObserverTarget(tostring(v or "")) end,
 	setstalemateontimelimit = function(self, v)
 		self.allowStalemateAtTimelimit = tonumber(v) == 1 or tostring(v) == "true"
 	end,
 	-- PlayVO is heard by everyone (BroadcastSound to 255), the others by one team.
-	playvo = function(self, v) TF2.BroadcastSound(TF2.TEAM_UNASSIGNED, tostring(v)) end,
-	playvored = function(self, v) TF2.BroadcastSound(TF2.TEAM_RED, tostring(v)) end,
-	playvoblue = function(self, v) TF2.BroadcastSound(TF2.TEAM_BLUE, tostring(v)) end,
+	playvo = function(self, v) WETSAND.BroadcastSound(WETSAND.TEAM_UNASSIGNED, tostring(v)) end,
+	playvored = function(self, v) WETSAND.BroadcastSound(WETSAND.TEAM_RED, tostring(v)) end,
+	playvoblue = function(self, v) WETSAND.BroadcastSound(WETSAND.TEAM_BLUE, tostring(v)) end,
 	setroundrespawnfreezeenabled = function(self, value)
-		TF2.RestartFreeze:SetBool(tonumber(value) ~= 0 and tostring(value) ~= "false")
+		WETSAND.RestartFreeze:SetBool(tonumber(value) ~= 0 and tostring(value) ~= "false")
 	end,
 	-- Accepted so the map's I/O is honoured, with no effect in GMod: no
 	-- holiday map events, KOTH clocks, CTF bonus, upgrades file or truce.

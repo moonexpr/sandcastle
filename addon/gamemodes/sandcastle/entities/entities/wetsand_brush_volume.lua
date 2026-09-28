@@ -29,7 +29,7 @@ end
 
 -- TeamNum 0 means any team.
 function ENT:AllowsTeam(team)
-	return self.team == TF2.TEAM_UNASSIGNED or self.team == team
+	return self.team == WETSAND.TEAM_UNASSIGNED or self.team == team
 end
 
 local BASE_INPUTS = {

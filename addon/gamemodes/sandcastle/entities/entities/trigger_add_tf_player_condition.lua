@@ -14,7 +14,7 @@ end
 
 function ENT:PlayerStartTouch(ply)
 	if not self:PassesTriggerFilters(ply) or self.condition < 0 then return end
-	TF2.AddCondition(ply, self.condition, self.duration)
+	WETSAND.AddCondition(ply, self.condition, self.duration)
 	self:TriggerOutput("OnStartTouch", ply)
 end
 
@@ -22,5 +22,5 @@ function ENT:PlayerEndTouch(ply)
 	self:TriggerOutput("OnEndTouch", ply)
 	if self.duration ~= PERMANENT or not self.enabled then return end
 	if not self:PassesTriggerFilters(ply) or self.condition < 0 then return end
-	TF2.RemoveCondition(ply, self.condition)
+	WETSAND.RemoveCondition(ply, self.condition)
 end

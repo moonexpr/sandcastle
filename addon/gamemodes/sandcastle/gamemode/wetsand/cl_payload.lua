@@ -1,6 +1,6 @@
 -- The payload race announcer lines (Announcer.PLR_*). TF2's soundscripts no
 -- longer define them, so they are registered here, on the client, where
--- TF2.BroadcastSound plays them; like TF2's other announcer entries they use
+-- WETSAND.BroadcastSound plays them; like TF2's other announcer entries they use
 -- CHAN_VOICE2 and no attenuation.
 local R = include("lib_payload_race.lua")
 

@@ -3,8 +3,8 @@
 -- (CTFGameRules::ShouldShowTeamGoal); TF2's win panel (tf_hud_winpanel.cpp);
 -- the sudden death panel (tf_hud_stalemate.cpp); the game-over reason; and
 -- round notices such as a blocked capture.
-local L = TF2.RoundsLib
-local S = TF2.STATE
+local L = WETSAND.RoundsLib
+local S = WETSAND.STATE
 
 surface.CreateFont("TF2Rounds.Title", { font = "Roboto", size = 34, weight = 900 })
 surface.CreateFont("TF2Rounds.Text", { font = "Roboto", size = 18, weight = 600 })
@@ -45,12 +45,12 @@ local function DrawRoundPanel(w, h)
 		lines[#lines + 1] = { string.format("Stage %d of %d", GetGlobal2Int("tf2.round.stage", 0), stages), GOLD }
 	end
 	lines[#lines + 1] = {
-		string.format("RED %d  :  %d BLU", team.GetScore(TF2.TEAM_RED), team.GetScore(TF2.TEAM_BLUE)), color_white,
+		string.format("RED %d  :  %d BLU", team.GetScore(WETSAND.TEAM_RED), team.GetScore(WETSAND.TEAM_BLUE)), color_white,
 	}
-	local myTeam = TF2.TeamOf(LocalPlayer())
-	if myTeam ~= TF2.TEAM_UNASSIGNED and ShowGoal(TF2.State()) then
+	local myTeam = WETSAND.TeamOf(LocalPlayer())
+	if myTeam ~= WETSAND.TEAM_UNASSIGNED and ShowGoal(WETSAND.State()) then
 		local goal = Localize(GetGlobal2String("tf2.round.goal" .. myTeam, ""))
-		if goal then lines[#lines + 1] = { goal, TF2.TeamColor[myTeam] } end
+		if goal then lines[#lines + 1] = { goal, WETSAND.TeamColor[myTeam] } end
 	end
 
 	surface.SetFont("TF2Rounds.Small")
@@ -87,7 +87,7 @@ local function DrawWinPanel(w, h)
 	local rows = {}
 	if panel.reason then rows[#rows + 1] = panel.reason end
 	if panel.details then rows[#rows + 1] = panel.details end
-	DrawCentrePanel(w, h, panel.title, TF2.TeamColor[GetGlobal2Int("tf2.winner", 0)] or color_white, rows)
+	DrawCentrePanel(w, h, panel.title, WETSAND.TeamColor[GetGlobal2Int("tf2.winner", 0)] or color_white, rows)
 end
 
 local stalemateSince
@@ -115,7 +115,7 @@ local function DrawNotices(w, h)
 		if CurTime() > notices[i].expires then table.remove(notices, i) end
 	end
 	for i, n in ipairs(notices) do
-		draw.SimpleTextOutlined(n.text, "TF2Rounds.Small", w - 16, y + (i - 1) * 20, TF2.TeamColor[n.team] or color_white,
+		draw.SimpleTextOutlined(n.text, "TF2Rounds.Small", w - 16, y + (i - 1) * 20, WETSAND.TeamColor[n.team] or color_white,
 			TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP, 1, color_black)
 	end
 end
@@ -124,7 +124,7 @@ end
 
 local lastState
 hook.Add("SandcastleHUDPaint", "tf2.rounds", function(w, h)
-	local state = TF2.State()
+	local state = WETSAND.State()
 	if state == S.STALEMATE and lastState ~= S.STALEMATE then stalemateSince = CurTime() end
 	lastState = state
 

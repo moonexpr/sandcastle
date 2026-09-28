@@ -3,20 +3,20 @@
 -- payload race), publishes every cart and timed capture for the HUD, and
 -- plays the payload race stage-outcome lines.
 
-TF2.Payload = include("lib_payload.lua")
-TF2.PayloadCapture = include("lib_payload_capture.lua")
-TF2.PayloadRace = include("lib_payload_race.lua")
+WETSAND.Payload = include("lib_payload.lua")
+WETSAND.PayloadCapture = include("lib_payload_capture.lua")
+WETSAND.PayloadRace = include("lib_payload_race.lua")
 AddCSLuaFile("lib_payload_race.lua")
 
-local P, R = TF2.Payload, TF2.PayloadRace
+local P, R = WETSAND.Payload, WETSAND.PayloadRace
 
 -- tf_logic_multiple_escort marks a payload race map (CTFGameRules::SetMultipleTrains).
-function TF2.HasMultipleTrains()
+function WETSAND.HasMultipleTrains()
 	return #ents.FindByClass("tf_logic_multiple_escort") > 0
 end
 
 -- CTFGameRules::TimerMayExpire: no timer runs out while a point is being captured.
-function TF2.CaptureInProgress()
+function WETSAND.CaptureInProgress()
 	for _, area in ipairs(ents.FindByClass("trigger_capture_area")) do
 		if area:IsCapturing() then return true end
 	end
@@ -26,7 +26,7 @@ end
 local function PointData(points)
 	local data = {}
 	for i, point in ipairs(points) do
-		data[i] = { group = tonumber(TF2.KeyValues(point).point_group) or 0, owner = TF2.CapTeam(point) }
+		data[i] = { group = tonumber(WETSAND.KeyValues(point).point_group) or 0, owner = WETSAND.CapTeam(point) }
 	end
 	return data
 end
@@ -47,13 +47,13 @@ end
 
 -- WatcherThink's bFinalPointInMap: would capturing `point` win the game for a
 -- team that may capture it? With mini-rounds, only in the last playable round.
-function TF2.FinalPointInMap(point)
+function WETSAND.FinalPointInMap(point)
 	if #ents.FindByClass("team_control_point_master") == 0 then return false end
 	local rounds = ents.FindByClass("team_control_point_round")
 	local miniRounds = #rounds > 0
 	local points
 	if miniRounds then
-		local round = TF2.CurrentRound()
+		local round = WETSAND.CurrentRound()
 		if not IsValid(round) then return false end
 		points = round:Points()
 	else
@@ -62,8 +62,8 @@ function TF2.FinalPointInMap(point)
 	local index = IndexOf(points, point)
 	if not index then return false end
 	local teams = {}
-	for team = TF2.TEAM_RED, TF2.TEAM_BLUE do
-		if TF2.TeamCanCapPoint(point, team) then teams[#teams + 1] = team end
+	for team = WETSAND.TEAM_RED, WETSAND.TEAM_BLUE do
+		if WETSAND.TeamCanCapPoint(point, team) then teams[#teams + 1] = team end
 	end
 	return P.FinalPoint(miniRounds, miniRounds and PlayableRounds(rounds) or 0, PointData(points), index, teams)
 end
@@ -122,7 +122,7 @@ local function PublishCarts()
 		PublishCart(i, hud)
 		distances[hud.team] = watcher:TrainDistanceAlongTrack()
 	end
-	local race = TF2.HasMultipleTrains()
+	local race = WETSAND.HasMultipleTrains()
 	SetGlobal2Int("tf2.cart.count", #watchers)
 	SetGlobal2Bool("tf2.cart.race", race)
 	SetGlobal2Int("tf2.cart.leader", race and R.Leader(distances) or 0)
@@ -157,7 +157,7 @@ end
 
 local nextPublish = 0
 hook.Add("Think", "tf2.payload.hud", function()
-	if not TF2.Active() or CurTime() < nextPublish then return end
+	if not WETSAND.Active() or CurTime() < nextPublish then return end
 	nextPublish = CurTime() + 0.1
 	PublishCaptures(PublishCarts())
 end)
@@ -165,8 +165,8 @@ end)
 -- CTeamTrainWatcherMaster::FireGameEvent("teamplay_round_win"): on a race map
 -- each side hears its stage outcome; full_round is a win that resets the map.
 hook.Add("TF2RoundWin", "tf2.payload.race", function(winner)
-	if not TF2.HasMultipleTrains() then return end
-	for team, line in pairs(R.OutcomeLines(winner, TF2.Rules.forceMapReset)) do
-		TF2.BroadcastSound(team, line)
+	if not WETSAND.HasMultipleTrains() then return end
+	for team, line in pairs(R.OutcomeLines(winner, WETSAND.Rules.forceMapReset)) do
+		WETSAND.BroadcastSound(team, line)
 	end
 end)

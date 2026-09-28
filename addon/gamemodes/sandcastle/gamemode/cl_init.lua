@@ -11,13 +11,13 @@ end
 
 function GM:HUDPaint()
 	self.BaseClass.HUDPaint(self)
-	if not TF2.Active() then return end
-	TF2.DrawHUD()
+	if not WETSAND.Active() then return end
+	WETSAND.DrawHUD()
 	-- Modules draw their own HUD elements here.
 	hook.Run("SandcastleHUDPaint", ScrW(), ScrH())
 end
 
 function GM:Think()
 	self.BaseClass.Think(self)
-	if TF2.Active() then TF2.AnnouncerThink() end
+	if WETSAND.Active() then WETSAND.AnnouncerThink() end
 end

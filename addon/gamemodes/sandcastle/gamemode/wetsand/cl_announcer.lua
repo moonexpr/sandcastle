@@ -5,7 +5,7 @@
 -- in the HUD speaks, and only while it runs with auto_countdown on. Overtime
 -- is CTFGameRules::HandleOvertimeBegin. Win, loss, stalemate and sudden death
 -- music arrive from the server as tf2.sound.
-TF2.RoundsLib = include("lib_rounds.lua")
+WETSAND.RoundsLib = include("lib_rounds.lua")
 
 local SETUP_SOUND = {
 	[60] = "Announcer.RoundBegins60Seconds", [30] = "Announcer.RoundBegins30Seconds",
@@ -64,18 +64,18 @@ local function CountdownThink()
 	local s = GetGlobal2Int("tf2.timer.serial", 0)
 	if s ~= serial then
 		serial = s
-		armed = TF2.RoundsLib.ArmClientWarnings(left)
+		armed = WETSAND.RoundsLib.ArmClientWarnings(left)
 	end
 	if paused then return end
 
-	local warning = TF2.RoundsLib.NextClientWarning(armed, left)
+	local warning = WETSAND.RoundsLib.NextClientWarning(armed, left)
 	if warning then
 		armed[warning] = false
 		if speaks then Play((setup and SETUP_SOUND or ROUND_SOUND)[warning]) end
 	end
 end
 
-function TF2.AnnouncerThink()
+function WETSAND.AnnouncerThink()
 	OvertimeThink()
 	CountdownThink()
 end

@@ -8,7 +8,7 @@
 --   HALLOWEEN_QUICK_HEAL: heals 30 health a second, up to max health.
 -- Movement and stun state reach clients as NW2 vars for prediction:
 -- tf2.speedboost, tf2.stunEnd, tf2.stunAmount, tf2.stunFlags.
-local P = TF2.PlayerRules
+local P = WETSAND.PlayerRules
 local C = P.COND
 
 -- HALLOWEEN_QUICK_HEAL: CTFPlayerShared::Heal(outer, 30, ...), per second.
@@ -24,24 +24,24 @@ local function SyncMovement(ply)
 	ply:SetNW2Bool("tf2.speedboost", P.InCond(Conds(ply), C.SPEED_BOOST, CurTime()))
 end
 
-function TF2.AddCondition(ply, cond, duration)
+function WETSAND.AddCondition(ply, cond, duration)
 	P.AddCond(Conds(ply), cond, duration, CurTime())
 	if cond == C.BURNING then ply:Ignite(duration > 0 and duration or 10) end
 	SyncMovement(ply)
 end
 
-function TF2.RemoveCondition(ply, cond)
+function WETSAND.RemoveCondition(ply, cond)
 	P.RemoveCond(Conds(ply), cond)
 	if cond == C.BURNING then ply:Extinguish() end
 	SyncMovement(ply)
 end
 
-function TF2.InCondition(ply, cond)
+function WETSAND.InCondition(ply, cond)
 	return P.InCond(Conds(ply), cond, CurTime())
 end
 
 -- CTFPlayerShared::RemoveAllCond: also ends a stun.
-function TF2.RemoveAllConditions(ply)
+function WETSAND.RemoveAllConditions(ply)
 	ply.tf2Conds = {}
 	ply.tf2Stun = nil
 	ply:SetNW2Float("tf2.stunEnd", 0)
@@ -50,13 +50,13 @@ function TF2.RemoveAllConditions(ply)
 end
 
 -- CTFPlayer::Regenerate's condition removals.
-function TF2.ClearConditionsOnRegenerate(ply)
+function WETSAND.ClearConditionsOnRegenerate(ply)
 	P.ClearOnRegenerate(Conds(ply))
 	ply:Extinguish()
 	SyncMovement(ply)
 end
 
-function TF2.StunPlayer(ply, duration, reduction, flags)
+function WETSAND.StunPlayer(ply, duration, reduction, flags)
 	local stun = P.Stun(ply.tf2Stun, duration, reduction, flags, CurTime())
 	ply.tf2Stun = stun
 	ply:SetNW2Float("tf2.stunEnd", stun.ends)
@@ -65,8 +65,8 @@ function TF2.StunPlayer(ply, duration, reduction, flags)
 end
 
 -- A player starts each life with no conditions.
-hook.Add("PlayerSpawn", "tf2.conditions", TF2.RemoveAllConditions)
-hook.Add("PostPlayerDeath", "tf2.conditions", TF2.RemoveAllConditions)
+hook.Add("PlayerSpawn", "tf2.conditions", WETSAND.RemoveAllConditions)
+hook.Add("PostPlayerDeath", "tf2.conditions", WETSAND.RemoveAllConditions)
 
 hook.Add("EntityTakeDamage", "tf2.conditions", function(target, dmg)
 	if not target:IsPlayer() then return end

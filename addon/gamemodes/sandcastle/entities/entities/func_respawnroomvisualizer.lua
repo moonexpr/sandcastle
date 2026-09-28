@@ -26,7 +26,7 @@ local visualizers = setmetatable({}, { __mode = "k" })
 -- The team this forcefield stops the enemies of, or 0 when it stops nobody.
 function ENT:CollisionTeam()
 	if not (self:GetEnabled() and self:GetFieldOn()) then return 0 end
-	if TF2.State() == TF2.STATE.TEAM_WIN then return 0 end
+	if WETSAND.State() == WETSAND.STATE.TEAM_WIN then return 0 end
 	return self:GetRoomTeam()
 end
 
@@ -39,7 +39,7 @@ end
 
 function ENT:Blocks(ent)
 	if not ent:IsPlayer() then return false end
-	return TF2.TeamRules.VisualizerBlocks(self.collisionTeam, ent.tf2CollisionTeam or ent:Team())
+	return WETSAND.TeamRules.VisualizerBlocks(self.collisionTeam, ent.tf2CollisionTeam or ent:Team())
 end
 
 function ENT:InitCollision()
@@ -74,8 +74,8 @@ if CLIENT then
 	end
 
 	function ENT:Draw()
-		local teamWin = TF2.State() == TF2.STATE.TEAM_WIN
-		if self:GetEnabled() and TF2.TeamRules.VisualizerVisible(self:GetRoomTeam(), self:GetRoomActive(), teamWin, LocalPlayer():Team()) then
+		local teamWin = WETSAND.State() == WETSAND.STATE.TEAM_WIN
+		if self:GetEnabled() and WETSAND.TeamRules.VisualizerVisible(self:GetRoomTeam(), self:GetRoomActive(), teamWin, LocalPlayer():Team()) then
 			self:DrawModel()
 		end
 	end
@@ -126,7 +126,7 @@ end
 
 -- CFuncRespawnRoomVisualizer::InputRoundActivate
 function ENT:RoundActivate()
-	local room = TF2.FindByName(self.roomName)
+	local room = WETSAND.FindByName(self.roomName)
 	if IsValid(room) and room:GetClass() == "func_respawnroom" then
 		room:AddVisualizer(self)
 		self:SetRoomTeam(room.team)

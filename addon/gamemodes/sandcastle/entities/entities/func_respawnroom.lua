@@ -39,11 +39,11 @@ end
 -- CFuncRespawnRoom::InputRoundActivate: a room placed with no team takes the
 -- team of an enabled spawn point inside it, as the round has set them up.
 function ENT:RoundActivate()
-	if self.originalTeam ~= TF2.TEAM_UNASSIGNED then return end
-	self:ChangeTeam(TF2.TEAM_UNASSIGNED)
+	if self.originalTeam ~= WETSAND.TEAM_UNASSIGNED then return end
+	self:ChangeTeam(WETSAND.TEAM_UNASSIGNED)
 	for _, spawn in ipairs(ents.FindByClass("info_player_teamspawn")) do
-		local s = TF2.SpawnState(spawn)
-		if not s.disabled and s.team > TF2.TEAM_SPECTATOR and self:PointIsWithin(spawn:GetPos()) then
+		local s = WETSAND.SpawnState(spawn)
+		if not s.disabled and s.team > WETSAND.TEAM_SPECTATOR and self:PointIsWithin(spawn:GetPos()) then
 			self:ChangeTeam(s.team)
 			return
 		end

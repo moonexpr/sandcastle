@@ -1,8 +1,8 @@
 -- The team select screen (CTFTeamMenu, resource/ui/Teammenu.res) for any
--- game's teams. TF2.TeamRules.TeamMenu decides the choices; this file draws
+-- game's teams. WETSAND.TeamRules.TeamMenu decides the choices; this file draws
 -- them and sends jointeam, which the server checks again. TF2's configuration
 -- (BLU left, RED right, its hotkeys) is at the bottom.
-local L = TF2.TeamRules
+local L = WETSAND.TeamRules
 
 -- Teammenu.res lays the screen out in units of 480 to the screen's height:
 -- doors 124 x 310 at y 101 with the team counts above them, the spectate
@@ -303,12 +303,12 @@ vgui.Register("TF2TeamMenu", MENU, "EditablePanel")
 local TF2_MENU = {
 	title = "SELECT A TEAM",
 	teams = {
-		{ index = TF2.TEAM_BLUE, name = TF2.TeamName[TF2.TEAM_BLUE], color = TF2.TeamColor[TF2.TEAM_BLUE], command = "blue" },
-		{ index = TF2.TEAM_RED, name = TF2.TeamName[TF2.TEAM_RED], color = TF2.TeamColor[TF2.TEAM_RED], command = "red" },
+		{ index = WETSAND.TEAM_BLUE, name = WETSAND.TeamName[WETSAND.TEAM_BLUE], color = WETSAND.TeamColor[WETSAND.TEAM_BLUE], command = "blue" },
+		{ index = WETSAND.TEAM_RED, name = WETSAND.TeamName[WETSAND.TEAM_RED], color = WETSAND.TeamColor[WETSAND.TEAM_RED], command = "red" },
 	},
 	auto = { name = "AUTO-ASSIGN", color = Color(112, 102, 88), command = "auto" },
-	spectate = { index = TF2.TEAM_SPECTATOR, name = "SPECTATE", color = Color(62, 60, 58), command = "spectate" },
-	limit = TF2.UnbalanceLimit,
+	spectate = { index = WETSAND.TEAM_SPECTATOR, name = "SPECTATE", color = Color(62, 60, 58), command = "spectate" },
+	limit = WETSAND.UnbalanceLimit,
 	autoKey = KEY_SPACE,
 	cancel = { label = "CANCEL (0)", key = KEY_0 },
 	closeBinds = { "changeteam", "gm_showteam" },
@@ -317,7 +317,7 @@ local TF2_MENU = {
 local menu
 
 -- CTFTeamMenu::ShowPanel does nothing while the menu is already up.
-function TF2.OpenTeamMenu()
+function WETSAND.OpenTeamMenu()
 	if IsValid(menu) then return end
 	menu = vgui.Create("TF2TeamMenu")
 	menu:SetConfig(TF2_MENU)
@@ -325,7 +325,7 @@ function TF2.OpenTeamMenu()
 end
 
 net.Receive("tf2.team.menu", function()
-	TF2.OpenTeamMenu()
+	WETSAND.OpenTeamMenu()
 end)
 
 -- The server opens the menu for a player without a team once the client can

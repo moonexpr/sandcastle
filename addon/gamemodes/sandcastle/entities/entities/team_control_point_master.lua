@@ -76,7 +76,7 @@ function ENT:RoundInfos()
 end
 
 function ENT:NumPlayable()
-	return TF2.RoundsLib.PlayableCount(self:RoundInfos())
+	return WETSAND.RoundsLib.PlayableCount(self:RoundInfos())
 end
 
 -- The stage of a multi-stage map for the HUD: the current round's place in
@@ -85,7 +85,7 @@ function ENT:PublishStage()
 	local stage, name = 0, ""
 	if IsValid(self.current) then
 		for i, r in ipairs(self.rounds) do
-			if r == self.current then stage = TF2.RoundsLib.StageOf(self:RoundInfos(), i) end
+			if r == self.current then stage = WETSAND.RoundsLib.StageOf(self:RoundInfos(), i) end
 		end
 		name = self.current.printName
 	end
@@ -97,13 +97,13 @@ end
 -- GetControlPointRoundToPlay and RegisterRoundBeingPlayed. The gamerules
 -- remember the rounds played (CTeamplayRoundBasedRules::AddPlayedRound).
 function ENT:ChooseRound()
-	local rules = TF2.Rules
+	local rules = WETSAND.Rules
 	local history = {
 		previous = rules.previousRounds,
 		first = rules.firstRoundPlayed,
 		firstAfterRestart = self.firstRoundAfterRestart,
 	}
-	local i = TF2.RoundsLib.ChooseRound(self:RoundInfos(), history, math.random)
+	local i = WETSAND.RoundsLib.ChooseRound(self:RoundInfos(), history, math.random)
 	if not i then
 		self.current = NULL
 		self:PublishStage()
@@ -144,19 +144,19 @@ end
 local function PointStates(points, override, overrideTeam)
 	local states = {}
 	for i, p in ipairs(points) do
-		states[i] = { owner = p == override and overrideTeam or TF2.CapTeam(p), group = TF2.PointGroup(p) }
+		states[i] = { owner = p == override and overrideTeam or WETSAND.CapTeam(p), group = WETSAND.PointGroup(p) }
 	end
 	return states
 end
 
 -- CTeamControlPointMaster::WouldNewCPOwnerWinGame (over every point).
 function ENT:WouldNewOwnerWin(point, team)
-	local points = TF2.ControlPoints()
-	return TF2.RoundsLib.TeamOwnsAllPoints(PointStates(points, point, team)) == team
+	local points = WETSAND.ControlPoints()
+	return WETSAND.RoundsLib.TeamOwnsAllPoints(PointStates(points, point, team)) == team
 end
 
 function ENT:FireTeamWinOutput(team)
-	self:TriggerOutput(team == TF2.TEAM_RED and "OnWonByTeam1" or "OnWonByTeam2", self)
+	self:TriggerOutput(team == WETSAND.TEAM_RED and "OnWonByTeam1" or "OnWonByTeam2", self)
 end
 
 -- A mini-round win resets the map only when no playable round is left, and
@@ -164,19 +164,19 @@ end
 function ENT:DeclareWinner(team)
 	local forceMapReset = true
 	if self:PlayingMiniRounds() then forceMapReset = self:NumPlayable() == 0 end
-	TF2.Rules:SetWinningTeam(team, TF2.RoundsLib.WINREASON.ALL_POINTS_CAPTURED, forceMapReset, forceMapReset and self.switchTeams)
+	WETSAND.Rules:SetWinningTeam(team, WETSAND.RoundsLib.WINREASON.ALL_POINTS_CAPTURED, forceMapReset, forceMapReset and self.switchTeams)
 	self:FireTeamWinOutput(team)
 end
 
 -- CTeamControlPointMaster::CheckWinConditions
 function ENT:CheckWinConditions()
-	if self.disabled or not IsValid(TF2.Rules) then return end
+	if self.disabled or not IsValid(WETSAND.Rules) then return end
 	local winner
 	if self:PlayingMiniRounds() then
 		if not IsValid(self.current) then return end
 		winner = self.current:CheckWinConditions()
 	else
-		winner = TF2.RoundsLib.RoundWinner(self.restrictTeam, PointStates((TF2.ControlPoints())))
+		winner = WETSAND.RoundsLib.RoundWinner(self.restrictTeam, PointStates((WETSAND.ControlPoints())))
 	end
 	if winner then self:DeclareWinner(winner) end
 end
@@ -184,15 +184,15 @@ end
 -- CPMThink
 function ENT:Think()
 	self:NextThink(CurTime() + 0.2)
-	if IsValid(TF2.Rules) and TF2.Rules:PointsMayBeCaptured() then self:CheckWinConditions() end
+	if IsValid(WETSAND.Rules) and WETSAND.Rules:PointsMayBeCaptured() then self:CheckWinConditions() end
 	return true
 end
 
 -- CTeamControlPointMaster::InternalSetWinner: team 0 is a stalemate.
 function ENT:SetWinner(team)
-	if team == TF2.TEAM_UNASSIGNED then
+	if team == WETSAND.TEAM_UNASSIGNED then
 		local forceMapReset = not self:PlayingMiniRounds() or self:NumPlayable() == 0
-		TF2.Rules:SetStalemate(TF2.RoundsLib.STALEMATE.TIMER, forceMapReset)
+		WETSAND.Rules:SetStalemate(WETSAND.RoundsLib.STALEMATE.TIMER, forceMapReset)
 		return
 	end
 	self:DeclareWinner(team)
@@ -200,24 +200,24 @@ end
 
 -- InputSetWinnerAndForceCaps: the survivors of sudden death take every point in play.
 function ENT:SetWinnerAndForceCaps(team)
-	for _, point in ipairs(TF2.ControlPoints()) do
-		if self:IsInRound(point) then TF2.ForcePointOwner(point, team) end
+	for _, point in ipairs(WETSAND.ControlPoints()) do
+		if self:IsInRound(point) then WETSAND.ForcePointOwner(point, team) end
 	end
 	self:SetWinner(team)
 end
 
 -- The rounds a team still has to win to take every point (CalcNumRoundsRemaining).
 function ENT:RoundsRemaining(team)
-	local points, rankOf = TF2.ControlPoints()
+	local points, rankOf = WETSAND.ControlPoints()
 	local states = {}
-	for i, p in ipairs(points) do states[i] = { owner = TF2.CapTeam(p) } end
+	for i, p in ipairs(points) do states[i] = { owner = WETSAND.CapTeam(p) } end
 	local rounds = {}
 	for i, r in ipairs(self.rounds) do
 		local indices = {}
 		for _, p in ipairs(r:Points()) do indices[#indices + 1] = rankOf[p] + 1 end
 		rounds[i] = { restrict = r.restrictTeam, points = indices }
 	end
-	return TF2.RoundsLib.RoundsRemaining(team, rounds, states)
+	return WETSAND.RoundsLib.RoundsRemaining(team, rounds, states)
 end
 
 local INPUTS = {
