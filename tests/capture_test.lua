@@ -1,7 +1,7 @@
--- foundation.payload_capture: CTriggerAreaCapture::CaptureThink as a state machine
+-- foundation.capture: CTriggerAreaCapture::CaptureThink as a state machine
 -- (trigger_area_capture.cpp).
 local T = dofile("tests/harness.lua")
-local C = T.require("foundation.payload_capture")
+local C = T.require("foundation.capture")
 
 local RED, BLU = 2, 3
 

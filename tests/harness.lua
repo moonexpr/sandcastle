@@ -1,6 +1,6 @@
 -- Minimal harness for Sandcastle's pure-logic libraries, run under plain
--- LuaJIT (no GMod). Libraries under test live in gamemode/foundation/*.lua and
--- use no GMod globals, so a test loads them with T.require.
+-- LuaJIT (no GMod). Libraries under test live in gamemode/foundation/ and use
+-- no GMod globals, so a test loads them with T.require.
 local T = { passed = 0, failed = 0 }
 
 T.ROOT = "addon/gamemodes/sandcastle/gamemode/"

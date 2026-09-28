@@ -40,6 +40,12 @@ T.test("a module requires a sibling through the same loader", function()
 	T.eq(Farewell.require, nil, "require stays outside the module")
 end)
 
+T.test("a part loads under its system and nests in the system's table", function()
+	local Formal = requireFixture("fixtures.greeting.formal")
+	T.eq(Formal._NAME, "fixtures.greeting.formal", "part name")
+	T.eq(package.loaded["fixtures.greeting"].formal, Formal, "part inside the system")
+end)
+
 T.test("gamemode root is the gamemode folder", function()
 	T.eq(T.ROOT, "addon/gamemodes/sandcastle/gamemode/", "root")
 end)

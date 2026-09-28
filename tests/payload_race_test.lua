@@ -1,6 +1,6 @@
--- foundation.payload_race: payload race (plr_) comparisons.
+-- foundation.payload.race: payload race (plr_) comparisons.
 local T = dofile("tests/harness.lua")
-local R = T.require("foundation.payload_race")
+local R = T.require("foundation.payload.race")
 
 local RED, BLU = 2, 3
 

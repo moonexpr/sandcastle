@@ -3,13 +3,13 @@
 -- from the keyvalues the map gave it (sv_world.lua records them): its team,
 -- whether it is disabled, and its links to a control point or a mini-round.
 -- The records are set up per round as TF2 does before it respawns players
--- (foundation/teams_spawn.lua), map inputs change them during the round, and a
+-- (foundation/spawn.lua), map inputs change them during the round, and a
 -- spawning player takes the next valid spot.
-local S = WETSAND.require("foundation.teams_spawn")
+local S = WETSAND.require("foundation.spawn")
 
 local records = setmetatable({}, { __mode = "k" })
 
--- The spawn's TF2 state (see foundation/teams_spawn.lua for the fields).
+-- The spawn's TF2 state (see foundation/spawn.lua for the fields).
 function WETSAND.SpawnState(ent)
 	local s = records[ent]
 	if not s then
