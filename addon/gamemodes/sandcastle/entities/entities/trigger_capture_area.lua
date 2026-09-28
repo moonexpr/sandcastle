@@ -145,7 +145,7 @@ local EVENTS = {
 	numcappers = function(self, point, e) self:SetNumCappers(e.n, e.blocked) end,
 	-- UpdateBlocked: the point hears a block when it starts
 	blocked = function(self, point, e)
-		if e.value then TF2.PointCaptureBlocked(point, e.capping) end
+		if e.value then TF2.PointCaptureBlocked(point, TF2.EnemyOf(e.capping)) end
 	end,
 	["break"] = function(self, point, e)
 		self:TriggerOutput("OnBreak" .. TEAM_OUTPUT[e.team], self)

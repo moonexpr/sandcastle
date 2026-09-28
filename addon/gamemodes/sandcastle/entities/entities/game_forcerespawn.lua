@@ -17,7 +17,7 @@ function ENT:ForceRespawn(switchTeams, onlyTeam)
 		local team = TF2.TeamOf(ply)
 		if team ~= TF2.TEAM_UNASSIGNED then
 			if switchTeams then
-				TF2.SetPlayerTeam(ply, TF2.EnemyOf(team))
+				TF2.SetPlayerTeam(ply, TF2.EnemyOf(team), true)
 				team = TF2.EnemyOf(team)
 			end
 			if onlyTeam == TF2.TEAM_UNASSIGNED or (team == onlyTeam and not ply:Alive()) then

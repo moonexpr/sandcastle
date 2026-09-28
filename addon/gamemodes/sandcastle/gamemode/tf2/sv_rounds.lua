@@ -147,7 +147,7 @@ end
 function TF2.SwitchTeams()
 	for _, ply in ipairs(player.GetAll()) do
 		local team = TF2.TeamOf(ply)
-		if team ~= TF2.TEAM_UNASSIGNED then TF2.SetPlayerTeam(ply, TF2.EnemyOf(team)) end
+		if team ~= TF2.TEAM_UNASSIGNED then TF2.SetPlayerTeam(ply, TF2.EnemyOf(team), true) end
 	end
 end
 

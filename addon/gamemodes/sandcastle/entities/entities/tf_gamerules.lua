@@ -177,6 +177,7 @@ end
 -- PREROUND -------------------------------------------------------------------------------
 
 function ENT:StateEnter_PREROUND()
+	TF2.BalanceTeams(false)
 	self:RoundRespawn()
 	self.transitionAt = CurTime() + PREROUND_SECONDS * enableroundwaittime:GetFloat()
 	SetGlobal2Float("tf2.preroundEnd", self.transitionAt)
