@@ -710,4 +710,32 @@ T.test("a skull is thrown up and out from beside the thrower, with a 2-2.5 s fus
 	T.eq(throw.model, Zombie.SKULL_MODEL, "the skull")
 end)
 
+-- The bindings
+
+local ENTITIES = "addon/gamemodes/sandcastle/entities/entities/"
+
+local function ReadFile(path)
+	local f = assert(io.open(path, "r"))
+	local text = f:read("*a")
+	f:close()
+	return text
+end
+
+local function LoadsAtTopLevel(line)
+	if line:match("^%s") or line:match("^function ") then return false end
+	return line:find("WETSAND.require", 1, true) ~= nil or line:find("WETSAND.Feature", 1, true) ~= nil
+end
+
+T.test("the skeleton bindings load nothing at top level and shadow no engine method", function()
+	for _, file in ipairs({ "tf_zombie.lua", "tf_zombie_spawner.lua", "tf_projectile_spellspawnzombie.lua" }) do
+		local text = ReadFile(ENTITIES .. file)
+		for line in text:gmatch("[^\n]+") do
+			T.eq(LoadsAtTopLevel(line), false, file .. ": " .. line)
+		end
+		for name in text:gmatch("function ENT:(%w+)%(") do
+			T.eq(Actor.ENGINE[name], nil, file .. " defines engine method " .. name)
+		end
+	end
+end)
+
 T.finish()
