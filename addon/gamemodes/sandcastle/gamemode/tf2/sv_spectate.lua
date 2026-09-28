@@ -7,6 +7,7 @@
 -- info_observer_points. The model of each observer lives in `observing[ply]`;
 -- Apply() makes the engine's observer mode and target match it every tick.
 -- The rules themselves are in lib_spectate.lua.
+AddCSLuaFile("lib_spectate.lua") -- cl_spectate.lua reads its freezecam timings
 local Spec = include("lib_spectate.lua")
 
 local OBS = {
