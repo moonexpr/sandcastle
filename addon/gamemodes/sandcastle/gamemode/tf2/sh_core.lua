@@ -22,7 +22,16 @@ TF2.STATE = {
 	BETWEEN_RNDS = 10,
 }
 
-TF2.TeamName = { [0] = "Nobody", [2] = "RED", [3] = "BLU" }
+-- Pure rule libraries (lib_*.lua), shared so client prediction and drawing
+-- follow the same rules as the server.
+if SERVER then
+	AddCSLuaFile("lib_teams.lua")
+	AddCSLuaFile("lib_players.lua")
+end
+TF2.TeamRules = include("lib_teams.lua")
+TF2.PlayerRules = include("lib_players.lua")
+
+TF2.TeamName = { [0] = "Nobody", [1] = "Spectator", [2] = "RED", [3] = "BLU" }
 TF2.TeamColor = {
 	[0] = Color(220, 220, 220),
 	[2] = Color(189, 59, 59),
@@ -61,6 +70,7 @@ TF2.RestartFreeze = CreateConVar("tf_player_movement_restart_freeze", "1", FCVAR
 -- look around and shoot but not move (CTFPlayer::CanPlayerMove); the losing
 -- team cannot attack while the winners celebrate (TF2's humiliation).
 function TF2.RestrictCommand(ply, cmd)
+	TF2.RestrictStunned(ply, cmd)
 	local state = TF2.State()
 	if state == TF2.STATE.PREROUND then
 		if not TF2.RestartFreeze:GetBool() then return end
@@ -75,3 +85,32 @@ function TF2.RestrictCommand(ply, cmd)
 		end
 	end
 end
+
+-- A stun's control effects (CTFPlayerShared::StunPlayer): TF_STUN_CONTROLS
+-- takes movement and attacks, TF_STUN_LOSER_STATE attacks. The server sets
+-- the NW2 vars (sv_teams_conditions.lua).
+function TF2.RestrictStunned(ply, cmd)
+	if CurTime() >= ply:GetNW2Float("tf2.stunEnd", 0) then return end
+	local flags = ply:GetNW2Int("tf2.stunFlags", 0)
+	local STUN = TF2.PlayerRules.STUN
+	if bit.band(flags, STUN.CONTROLS) ~= 0 then
+		cmd:ClearMovement()
+		cmd:RemoveKey(IN_JUMP)
+	end
+	if bit.band(flags, STUN.CONTROLS + STUN.LOSER_STATE) ~= 0 then
+		cmd:RemoveKey(IN_ATTACK)
+		cmd:RemoveKey(IN_ATTACK2)
+	end
+end
+
+-- Speed boost and a stun's slow on the player's top speed, predicted on
+-- both realms (TeamFortress_CalculateMaxSpeed, CTFGameMovement).
+hook.Add("SetupMove", "tf2.conditions", function(ply, mv)
+	local boost = ply:GetNW2Bool("tf2.speedboost", false)
+	local reduction = 0
+	if CurTime() < ply:GetNW2Float("tf2.stunEnd", 0) then reduction = ply:GetNW2Float("tf2.stunAmount", 0) end
+	if not boost and reduction == 0 then return end
+	local speed = TF2.PlayerRules.MaxSpeed(mv:GetMaxClientSpeed(), boost, reduction)
+	mv:SetMaxClientSpeed(speed)
+	mv:SetMaxSpeed(speed)
+end)
