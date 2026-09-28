@@ -610,7 +610,7 @@ local function Draw(lo, hi) return lo + MID * (hi - lo) end
 
 T.test("a spawner's keyvalues make a finite spawner of HALLOWEEN skeletons", function()
 	local spawner = Spawner.New(Zombie.SpawnerConfig({
-		teamnum = "0",
+		teamnum = tostring(Teams.UNASSIGNED),
 		zombie_lifetime = "240",
 		max_zombies = "2",
 		infinite_zombies = "0",
