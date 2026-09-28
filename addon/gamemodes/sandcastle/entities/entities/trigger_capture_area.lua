@@ -1,9 +1,21 @@
--- trigger_capture_area: the volume players stand in to capture its control
--- point. On payload maps it rides the cart, and area_time_to_cap is set so
--- high that the point is captured by the track (CaptureCurrentCP) instead; what
--- matters is the capper count it reports to the team_train_watcher.
+-- trigger_capture_area (CTriggerAreaCapture, trigger_area_capture.cpp): the
+-- volume players stand in to capture its control point. Each think it counts
+-- the players inside and steps the capture (lib_payload_capture.lua), then
+-- fires the outputs, changes ownership and tells the point and any train
+-- watcher, in the order the SDK does. On payload maps it rides the cart with
+-- a huge area_time_to_cap, so the capture never completes by time: the track
+-- captures the point (CaptureCurrentCP) and what matters is the capper count
+-- (OnNumCappersChanged/2, -1 while blocked) that moves the cart.
 ENT.Type = "brush"
 ENT.Base = "base_brush"
+
+-- TF2's convars (teamplayroundbased_gamerules.cpp).
+local capstyle = CreateConVar("mp_capstyle", "1", FCVAR_REPLICATED, "Sets the style of capture points used. 0 = Fixed players required to cap. 1 = More players cap faster, but longer cap times.")
+local blockstyle = CreateConVar("mp_blockstyle", "1", FCVAR_REPLICATED, "Sets the style of capture point blocking used. 0 = Blocks break captures completely. 1 = Blocks only pause captures.")
+local capdeteriorate = CreateConVar("mp_capdeteriorate_time", "90.0", FCVAR_REPLICATED, "Time it takes for a full capture point to deteriorate.")
+
+local THINK_TIME = 0.1 -- AREA_THINK_TIME
+local C
 
 function ENT:KeyValue(key, value)
 	local k = string.lower(key)
@@ -19,115 +31,185 @@ function ENT:Key(name, default)
 	return v
 end
 
+-- team_<field>_2 and _3 as numbers.
+function ENT:TeamKeys(field, default)
+	return {
+		[TF2.TEAM_RED] = tonumber(self:Key(field .. "_2", default)) or default,
+		[TF2.TEAM_BLUE] = tonumber(self:Key(field .. "_3", default)) or default,
+	}
+end
+
 function ENT:Initialize()
+	C = TF2.PayloadCapture
 	if self.brushModel then self:SetModel(self.brushModel) end
 	self:SetSolid(SOLID_NONE)
 	self:SetNoDraw(true)
 	self.enabled = self:Key("startdisabled", "0") ~= "1"
 	self.pointName = self:Key("area_cap_point")
-	self.canCap = {
-		[TF2.TEAM_RED] = self:Key("team_cancap_2", "1") == "1",
-		[TF2.TEAM_BLUE] = self:Key("team_cancap_3", "1") == "1",
-	}
-	self.numCap = {
-		[TF2.TEAM_RED] = tonumber(self:Key("team_numcap_2", 1)) or 1,
-		[TF2.TEAM_BLUE] = tonumber(self:Key("team_numcap_3", 1)) or 1,
-	}
-	self.reported = 0
-	self.cappingTeam = TF2.TEAM_UNASSIGNED
+	self.capTime = tonumber(self:Key("area_time_to_cap", 5)) or 5
+	local canCap = self:TeamKeys("team_cancap", 1)
+	self.canCap = { [TF2.TEAM_RED] = canCap[TF2.TEAM_RED] ~= 0, [TF2.TEAM_BLUE] = canCap[TF2.TEAM_BLUE] ~= 0 }
+	-- Spawn: at least one player is always required
+	self.numRequired = self:TeamKeys("team_numcap", 1)
+	self.startRequired = self:TeamKeys("team_startcap", 1)
+	for _, t in ipairs({ TF2.TEAM_RED, TF2.TEAM_BLUE }) do
+		self.numRequired[t] = math.max(self.numRequired[t], 1)
+		self.startRequired[t] = math.max(self.startRequired[t], 1)
+	end
+	self.spawnAdjust = self:TeamKeys("team_spawn", 0)
+	self.cap = C.New(TF2.TEAM_UNASSIGNED)
 end
 
 function ENT:Point()
 	return TF2.FindByName(self.pointName)
 end
 
-function ENT:PointsMayBeCaptured()
-	return self.enabled and (not IsValid(TF2.Rules) or TF2.Rules:PointsMayBeCaptured())
-end
-
--- Which team is capturing, how many of them, and whether the other team blocks.
-function ENT:Survey()
-	local counts = { [TF2.TEAM_RED] = 0, [TF2.TEAM_BLUE] = 0 }
-	for _, ply in ipairs(TF2.PlayersInside(self)) do
-		local team = TF2.TeamOf(ply)
-		if counts[team] then counts[team] = counts[team] + 1 end
-	end
-	local point = self:Point()
-	local owner = IsValid(point) and TF2.CapTeam(point) or TF2.TEAM_UNASSIGNED
-	local capping = TF2.TEAM_UNASSIGNED
-	for team = TF2.TEAM_RED, TF2.TEAM_BLUE do
-		if self.canCap[team] and team ~= owner and counts[team] >= self.numCap[team] then
-			capping = team
-		end
-	end
-	local blocked = capping ~= TF2.TEAM_UNASSIGNED and counts[TF2.EnemyOf(capping)] > 0
-	return capping, counts[capping] or 0, blocked
-end
-
--- The number the train watcher is told: cappers, 0 for none, -1 when blocked.
-function ENT:Think()
-	self:NextThink(CurTime() + 0.1)
-	local capping, cappers, blocked = TF2.TEAM_UNASSIGNED, 0, false
-	if self:PointsMayBeCaptured() then
-		capping, cappers, blocked = self:Survey()
-	end
-	local report = blocked and -1 or cappers
-	self.blocked = blocked
-
-	if capping ~= self.cappingTeam then
-		if self.cappingTeam ~= TF2.TEAM_UNASSIGNED then
-			self:TriggerOutput("OnBreakCap", self)
-			self:TriggerOutput(self.cappingTeam == TF2.TEAM_RED and "OnBreakTeam1" or "OnBreakTeam2", self)
-		end
-		if capping ~= TF2.TEAM_UNASSIGNED then
-			self:TriggerOutput("OnStartCap", self)
-			self:TriggerOutput(capping == TF2.TEAM_RED and "OnStartTeam1" or "OnStartTeam2", self)
-		end
-		self.cappingTeam = capping
-	end
-
-	if report ~= self.reported then
-		self.reported = report
-		self:TriggerOutput("OnNumCappersChanged", self, tostring(math.max(report, 0)))
-		self:TriggerOutput("OnNumCappersChanged2", self, tostring(report))
-		for _, watcher in ipairs(ents.FindByClass("team_train_watcher")) do
-			if watcher:IsWatching(self:GetParent()) then
-				watcher:SetNumTrainCappers(report, self)
-			end
-		end
-	end
-	return true
+-- The watcher that moves the train this area rides (SetTrainWatcher).
+function ENT:SetTrainWatcher(watcher)
+	self.trainWatcher = watcher
 end
 
 function ENT:IsBlocked()
-	return self.blocked == true
+	return self.cap.blocked
 end
 
--- CaptureCurrentCP: the capping team, or else the first team that may cap and
--- does not own the point, takes it now.
-function ENT:CaptureCurrentPoint(activator)
-	local point = self:Point()
-	if not IsValid(point) then return end
-	local team = self.cappingTeam
-	if team == TF2.TEAM_UNASSIGNED then
-		for t = TF2.TEAM_BLUE, TF2.TEAM_RED, -1 do
-			if self.canCap[t] and TF2.CapTeam(point) ~= t then team = t break end
-		end
-	end
-	if team == TF2.TEAM_UNASSIGNED then return end
-	self:TriggerOutput("OnEndCap", self)
-	self:TriggerOutput(team == TF2.TEAM_RED and "OnCapTeam1" or "OnCapTeam2", self)
-	TF2.SetPointOwner(point, team, activator)
+function ENT:IsCapturing()
+	return self.cap.capturing
 end
+
+-- Counting players ------------------------------------------------------------------------
+
+-- CaptureThink counts a team only if the rules let it capture the point
+-- (TeamMayCapturePoint). TF2.TeamCanCapPoint also refuses the owner and teams
+-- this area never lets cap, which still count here: they defend and block.
+function ENT:TeamCounts(point, team)
+	return team == self.cap.owner or not self.canCap[team] or TF2.TeamCanCapPoint(point, team)
+end
+
+-- A disabled trigger touches nobody.
+function ENT:Counts(point)
+	local counts = { [TF2.TEAM_RED] = 0, [TF2.TEAM_BLUE] = 0 }
+	if not self.enabled then return counts end
+	for _, ply in ipairs(TF2.PlayersInside(self)) do
+		local team = TF2.TeamOf(ply)
+		if counts[team] and self:TeamCounts(point, team) then counts[team] = counts[team] + 1 end
+	end
+	return counts
+end
+
+function ENT:StepInput(point)
+	return {
+		now = CurTime(),
+		pointsMayBeCaptured = not IsValid(TF2.Rules) or TF2.Rules:PointsMayBeCaptured(),
+		counts = self:Counts(point),
+		canCap = self.canCap,
+		numRequired = self.numRequired,
+		startRequired = self.startRequired,
+		capTime = self.capTime,
+		scales = capstyle:GetBool(),
+		blockstyle = blockstyle:GetInt(),
+		deteriorate = capdeteriorate:GetFloat(),
+		overtime = GetGlobal2Bool("tf2.overtime", false),
+		teamMayCapture = function(team) return TF2.TeamCanCapPoint(point, team) end,
+	}
+end
+
+-- Events --------------------------------------------------------------------------------
+
+local TEAM_OUTPUT = { [2] = "Team1", [3] = "Team2" }
+
+-- SetNumCappers
+function ENT:SetNumCappers(n, blocked)
+	self:TriggerOutput("OnNumCappersChanged", self, tostring(n))
+	-- OnNumCappersChanged2 carries -1 for a blocked cart (hill decisions)
+	if blocked then n = -1 end
+	self:TriggerOutput("OnNumCappersChanged2", self, tostring(n))
+	if IsValid(self.trainWatcher) then self.trainWatcher:SetNumTrainCappers(n, self) end
+end
+
+-- HandleRespawnTimeAdjustments, then the point changes hands.
+function ENT:ChangeOwner(point, old, team)
+	for _, adjust in ipairs(C.SpawnAdjustments(old, team, self.spawnAdjust)) do
+		local input = adjust.team == TF2.TEAM_RED and "AddRedTeamRespawnWaveTime" or "AddBlueTeamRespawnWaveTime"
+		TF2.Rules:Fire(input, tostring(adjust.seconds))
+	end
+	TF2.SetPointOwner(point, team, self)
+end
+
+local EVENTS = {
+	start = function(self, point, e)
+		self:TriggerOutput("OnStart" .. TEAM_OUTPUT[e.team], self)
+		self:TriggerOutput("OnStartCap", self)
+	end,
+	capturestart = function(self, point, e) TF2.PointCaptureStarted(point, e.team) end,
+	numcappers = function(self, point, e) self:SetNumCappers(e.n, e.blocked) end,
+	-- UpdateBlocked: the point hears a block when it starts
+	blocked = function(self, point, e)
+		if e.value then TF2.PointCaptureBlocked(point, e.capping) end
+	end,
+	["break"] = function(self, point, e)
+		self:TriggerOutput("OnBreak" .. TEAM_OUTPUT[e.team], self)
+		self:TriggerOutput("OnBreakCap", self)
+	end,
+	["end"] = function(self, point, e)
+		self:TriggerOutput("OnCap" .. TEAM_OUTPUT[e.team], self)
+		self:TriggerOutput("OnEndCap", self)
+	end,
+	owner = function(self, point, e) self:ChangeOwner(point, e.old, e.team) end,
+}
+
+function ENT:Apply(point, events)
+	for _, e in ipairs(events) do EVENTS[e.kind](self, point, e) end
+end
+
+-- CaptureThink
+function ENT:Think()
+	self:NextThink(CurTime() + THINK_TIME)
+	local point = self:Point()
+	if not IsValid(point) then return true end
+	self.cap.owner = TF2.CapTeam(point)
+	self.lastInput = self:StepInput(point)
+	self:Apply(point, C.Step(self.cap, self.lastInput))
+	return true
+end
+
+-- Capture progress for the HUD, or nil with no point or while disabled.
+function ENT:HudState()
+	local point = self:Point()
+	if not self.enabled or not IsValid(point) or not self.lastInput then return nil end
+	return {
+		index = TF2.PointIndex(point),
+		owner = TF2.CapTeam(point),
+		capping = self.cap.cappingTeam,
+		progress = C.Progress(self.cap, self.lastInput),
+		blocked = self.cap.blocked,
+		cappers = self.cap.touching[self.cap.cappingTeam] or 0,
+	}
+end
+
+-- Inputs ------------------------------------------------------------------------------
 
 local INPUTS = {
-	setcontrolpoint = function(self, value) self.pointName = tostring(value) end,
-	capturecurrentcp = function(self, value, activator) self:CaptureCurrentPoint(activator) end,
+	-- InputSetControlPoint: break the capture of the old point first
+	setcontrolpoint = function(self, value)
+		local old = self:Point()
+		local events = C.Break(self.cap)
+		if IsValid(old) then self:Apply(old, events) end
+		self.pointName = tostring(value)
+		local point = self:Point()
+		if IsValid(point) then self.cap.owner = TF2.CapTeam(point) end
+	end,
+	capturecurrentcp = function(self)
+		local point = self:Point()
+		if IsValid(point) then self:Apply(point, C.CaptureCurrent(self.cap)) end
+	end,
+	-- "<team> <0/1>"
 	setteamcancap = function(self, value)
 		local team, can = string.match(tostring(value), "(%d+)%s+(%d+)")
 		team = tonumber(team)
-		if self.canCap[team] ~= nil then self.canCap[team] = can == "1" end
+		if self.canCap[team] ~= nil then self.canCap[team] = tonumber(can) ~= 0 end
 	end,
+	roundspawn = function() end,
 	enable = function(self) self.enabled = true end,
 	disable = function(self) self.enabled = false end,
 }
@@ -135,6 +217,6 @@ local INPUTS = {
 function ENT:AcceptInput(name, activator, caller, value)
 	local handler = INPUTS[string.lower(name)]
 	if not handler then return false end
-	handler(self, value, activator)
+	handler(self, value)
 	return true
 end
