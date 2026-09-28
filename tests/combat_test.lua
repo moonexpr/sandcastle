@@ -237,7 +237,7 @@ T.test("a top-level load is caught", function()
 end)
 
 T.test("the combat and holiday bindings load nothing at top level", function()
-	for _, file in ipairs({ "wetsand_combat_nextbot.lua" }) do
+	for _, file in ipairs({ "wetsand_combat_nextbot.lua", "tf_logic_holiday.lua" }) do
 		for line in ReadFile(ENTITIES .. file):gmatch("[^\n]+") do
 			T.eq(LoadsAtTopLevel(line), false, file .. ": " .. line)
 		end

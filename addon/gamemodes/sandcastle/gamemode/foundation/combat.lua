@@ -5,7 +5,9 @@
 --
 -- Explosion.New{ origin, radius, damage, attackerTeam, attacker,
 -- halfFalloff, forceFriendlyFire, crit }: origin is an engine vector,
--- attacker the entity credited (the controller's business). Then per victim:
+-- attacker the entity credited (the controller's business, as are the
+-- optional inflictor and enemy, the entity a projectile hit directly).
+-- Then per victim:
 --   :DistanceTo(center, origin, direct) -> the distance DamageTo takes;
 --   :DamageTo{ team, isAttacker, distance, visible } -> amount | nil.
 local require = require
