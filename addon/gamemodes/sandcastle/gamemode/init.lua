@@ -7,16 +7,26 @@ for _, f in ipairs(GM:TF2Modules("sh_")) do AddCSLuaFile("wetsand/" .. f) end
 for _, f in ipairs(GM:TF2Modules("cl_")) do AddCSLuaFile("wetsand/" .. f) end
 for _, f in ipairs(GM:TF2Modules("sv_")) do include("wetsand/" .. f) end
 
--- New players are auto-assigned (GetAutoTeam) before their first spawn.
+-- As in TF2, a new player joins no team: they watch until they pick one
+-- from the team menu (auto-assign is one click there).
 function GM:PlayerInitialSpawn(ply, transition)
 	self.BaseClass.PlayerInitialSpawn(self, ply, transition)
-	if TF2.Active() then TF2.SetPlayerTeam(ply, TF2.AutoTeam(), true) end
+	if TF2.Active() then TF2.SetInitialTeam(ply) end
 end
 
 function GM:PlayerSpawn(ply, transition)
-	self.BaseClass.PlayerSpawn(self, ply, transition)
-	if not TF2.Active() then return end
-	if ply:Team() == TF2.TEAM_SPECTATOR then TF2.StartObserving(ply) end
+	if not TF2.Active() then
+		self.BaseClass.PlayerSpawn(self, ply, transition)
+		return
+	end
+	-- CTFPlayer::StateEnterWELCOME: a player without a team is an observer,
+	-- never a live Sandbox player.
+	if ply.tf2Team == TF2.TEAM_UNASSIGNED then
+		TF2.StartObserving(ply)
+	else
+		self.BaseClass.PlayerSpawn(self, ply, transition)
+		if ply:Team() == TF2.TEAM_SPECTATOR then TF2.StartObserving(ply) end
+	end
 	-- Other addons move players between teams in their own spawn hooks (one
 	-- puts everyone on a "Runner" team), so correct the team after them.
 	timer.Simple(0, function()
@@ -61,7 +71,8 @@ function GM:ShowTeam(ply)
 	self.BaseClass.ShowTeam(self, ply)
 end
 
--- Base's changeteam command goes through TF2's join rules on TF2 maps.
+-- Base's changeteam command goes through TF2's join rules on TF2 maps;
+-- without a team index it opens the team menu, as TF2's changeteam does.
 local JOIN_NAME = {
 	[TF2.TEAM_SPECTATOR] = "spectate",
 	[TF2.TEAM_RED] = "red",
@@ -70,7 +81,11 @@ local JOIN_NAME = {
 
 function GM:PlayerRequestTeam(ply, teamIndex)
 	if TF2.Active() then
-		if JOIN_NAME[teamIndex] then TF2.JoinTeam(ply, JOIN_NAME[teamIndex]) end
+		if teamIndex == nil then
+			TF2.ShowTeamMenu(ply)
+		elseif JOIN_NAME[teamIndex] then
+			TF2.JoinTeam(ply, JOIN_NAME[teamIndex])
+		end
 		return
 	end
 	self.BaseClass.PlayerRequestTeam(self, ply, teamIndex)
