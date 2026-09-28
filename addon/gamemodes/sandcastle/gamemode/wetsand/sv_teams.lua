@@ -6,17 +6,23 @@
 local L = TF2.TeamRules
 
 util.AddNetworkString("tf2.team.menu")
+util.AddNetworkString("tf2.team.ready")
 
--- TF2's convars, as teamplayroundbased_gamerules.cpp defines them.
+-- TF2's convar, as teamplayroundbased_gamerules.cpp defines it;
+-- mp_teams_unbalance_limit is shared (sh_core.lua) for the team menu.
 local autoteambalance = CreateConVar("mp_autoteambalance", "1", FCVAR_NOTIFY,
 	"Automatically balance the teams based on mp_teams_unbalance_limit. 0 = off, 1 = forcibly switch", 0, 1)
-local unbalanceLimit = CreateConVar("mp_teams_unbalance_limit", "1", FCVAR_NONE,
-	"Teams are unbalanced when one team has this many more players than the other team. (0 disables check)", 0, 30)
+local unbalanceLimit = TF2.UnbalanceLimit
 
-local SPECTATOR, RED, BLUE = TF2.TEAM_SPECTATOR, TF2.TEAM_RED, TF2.TEAM_BLUE
+local UNASSIGNED, SPECTATOR, RED, BLUE = TF2.TEAM_UNASSIGNED, TF2.TEAM_SPECTATOR, TF2.TEAM_RED, TF2.TEAM_BLUE
 
 local function Playing(team)
 	return team == RED or team == BLUE
+end
+
+-- Players without a team and spectators watch the game in observer mode.
+local function Observes(team)
+	return team == UNASSIGNED or team == SPECTATOR
 end
 
 local function Counts()
@@ -38,51 +44,74 @@ end
 -- spawn hook of another addon that moves the player is undone (see
 -- TF2.RestoreTeam). CTFPlayer::ChangeTeam: a live player moving between RED
 -- and BLU dies, and comes back with the new team's respawn wave; joining
--- the spectators puts the player into observer mode. force follows
--- ForceChangeTeam with a full team switch: nobody dies (the round-end team
--- swap, whose players are respawned anyway).
+-- the spectators (or leaving players unassigned) puts the player into
+-- observer mode. force follows ForceChangeTeam with a full team switch:
+-- nobody dies (the round-end team swap, whose players are respawned anyway).
 function TF2.SetPlayerTeam(ply, newTeam, force)
 	local old = ply:Team()
 	ply.tf2Team = newTeam
 	if newTeam == old then return end
-	if newTeam == SPECTATOR then
+	if Observes(newTeam) then
 		-- HandleCommand_JoinTeam: a live player dies before becoming a spectator.
 		if not force and Playing(old) and ply:Alive() then Die(ply) end
 		ply:SetTeam(newTeam)
 		TF2.StartObserving(ply)
 		return
 	end
-	if old == SPECTATOR then
+	ply:SetTeam(newTeam)
+	if Observes(old) then
 		-- The engine needs a spawn or a kill after leaving observer mode; the
-		-- player waits, dead, for the new team's respawn wave.
+		-- player waits, dead, for the new team's respawn wave. The kill comes
+		-- after the team change so the wave is the new team's.
 		TF2.StopObserving(ply)
 		if ply:Alive() then ply:KillSilent() end
+	elseif not force and Playing(old) and ply:Alive() then
+		Die(ply)
 	end
-	ply:SetTeam(newTeam)
-	if not force and Playing(old) and ply:Alive() then Die(ply) end
+end
+
+-- CTFPlayer::InitialSpawn (TF_STATE_WELCOME): a new player has no team.
+-- GM:PlayerSpawn keeps them observing, and the team menu opens once their
+-- client is ready for it ("tf2.team.ready").
+function TF2.SetInitialTeam(ply)
+	ply.tf2Team = UNASSIGNED
+	ply:SetTeam(UNASSIGNED)
 end
 
 -- Undo a team change made behind TF2.SetPlayerTeam (other addons put
 -- players on their own teams, such as 21 "Runner", in their spawn hooks).
--- A player who never had a TF2 team keeps spectator, RED or BLU if they
--- are on one, and is assigned a team otherwise.
+-- A player who never had a TF2 team keeps it if they are on one, and is
+-- otherwise left without a team and shown the team menu.
 function TF2.RestoreTeam(ply)
 	if not ply.tf2Team then
 		local current = ply:Team()
-		if current == SPECTATOR or Playing(current) then
+		if Observes(current) or Playing(current) then
 			ply.tf2Team = current
 		else
-			TF2.SetPlayerTeam(ply, TF2.AutoTeam(), true)
+			TF2.SetPlayerTeam(ply, UNASSIGNED, true)
+			TF2.ShowTeamMenu(ply)
 		end
 	elseif ply:Team() ~= ply.tf2Team then
 		ply:SetTeam(ply.tf2Team)
 	end
 end
 
+-- CTFTeamMenu::ShowPanel refuses to open during game over, and for a
+-- losing player while the winners celebrate.
 function TF2.ShowTeamMenu(ply)
+	if not L.TeamMenuAllowed(TF2.State(), ply:Team(), GetGlobal2Int("tf2.winner", 0)) then
+		ply:PrintMessage(HUD_PRINTCENTER, "You can't change team at this time.")
+		return
+	end
 	net.Start("tf2.team.menu")
 	net.Send(ply)
 end
+
+-- Net messages sent during PlayerInitialSpawn can arrive before the client
+-- can take them, so the client says when it is ready for the menu.
+net.Receive("tf2.team.ready", function(_, ply)
+	if TF2.Active() and ply.tf2Team == UNASSIGNED then TF2.ShowTeamMenu(ply) end
+end)
 
 -- CTFPlayer::HandleCommand_JoinTeam: "red", "blue", "auto" or "spectate".
 -- A join that would unbalance the teams is refused and the menu shown again.

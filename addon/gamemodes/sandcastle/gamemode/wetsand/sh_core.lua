@@ -66,6 +66,11 @@ end
 TF2.RestartFreeze = CreateConVar("tf_player_movement_restart_freeze", "1", FCVAR_REPLICATED,
 	"When set, prevent player movement during round restart")
 
+-- TF2's convar (teamplayroundbased_gamerules.cpp), replicated as there, so the
+-- team menu disables the teams the server would refuse.
+TF2.UnbalanceLimit = CreateConVar("mp_teams_unbalance_limit", "1", FCVAR_REPLICATED,
+	"Teams are unbalanced when one team has this many more players than the other team. (0 disables check)", 0, 30)
+
 -- The input restrictions of the round states: during pre-round players may
 -- look around and shoot but not move (CTFPlayer::CanPlayerMove); the losing
 -- team cannot attack while the winners celebrate (TF2's humiliation).

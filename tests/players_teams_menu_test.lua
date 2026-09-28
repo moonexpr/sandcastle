@@ -1,0 +1,140 @@
+local T = dofile("tests/harness.lua")
+local L = T.lib("teams")
+
+local UNASSIGNED, SPEC, RED, BLU = 0, 1, 2, 3
+
+-- TF2's configuration: BLU left, RED right (Teammenu.res).
+local function Teams(blu, red)
+	return {
+		{ index = BLU, name = "BLU", color = "blue", count = blu, command = "blue" },
+		{ index = RED, name = "RED", color = "red", count = red, command = "red" },
+	}
+end
+
+local EXTRAS = {
+	auto = { name = "Auto-assign", command = "auto" },
+	spectate = { index = SPEC, name = "Spectate", command = "spectate", count = 0 },
+}
+
+-- CTFTeamMenu: the teams, in the order given
+
+T.test("team choices keep the given order, names, colours, commands and counts", function()
+	local menu = L.TeamMenu(Teams(4, 5), UNASSIGNED, 1, EXTRAS)
+	T.eq(#menu.teams, 2, "two teams")
+	local blu, red = menu.teams[1], menu.teams[2]
+	T.eq(blu.index, BLU, "left")
+	T.eq(blu.label, "BLU", "label")
+	T.eq(blu.color, "blue", "color")
+	T.eq(blu.command, "blue", "command")
+	T.eq(blu.count, 4, "count")
+	T.eq(red.index, RED, "right")
+	T.eq(red.count, 5, "red count")
+end)
+
+T.test("hotkeys follow Teammenu.res: auto 1, spectate 2, then the teams", function()
+	local menu = L.TeamMenu(Teams(0, 0), UNASSIGNED, 1, EXTRAS)
+	T.eq(menu.auto.hotkey, 1, "auto")
+	T.eq(menu.spectate.hotkey, 2, "spectate")
+	T.eq(menu.teams[1].hotkey, 3, "BLU")
+	T.eq(menu.teams[2].hotkey, 4, "RED")
+	T.eq(#menu.choices, 4, "every choice")
+	for i, c in ipairs(menu.choices) do T.eq(c.hotkey, i, "choices in hotkey order") end
+end)
+
+T.test("without auto-assign or spectate the teams take the first hotkeys", function()
+	local menu = L.TeamMenu(Teams(0, 0), UNASSIGNED, 1, {})
+	T.eq(menu.auto, nil, "no auto")
+	T.eq(menu.spectate, nil, "no spectate")
+	T.eq(menu.teams[1].hotkey, 1, "first team")
+	T.eq(#menu.choices, 2, "teams only")
+end)
+
+T.test("auto-assign and spectate are offered with their commands", function()
+	local menu = L.TeamMenu(Teams(0, 0), UNASSIGNED, 1, EXTRAS)
+	T.eq(menu.auto.command, "auto", "auto command")
+	T.eq(menu.auto.label, "Auto-assign", "auto label")
+	T.eq(menu.auto.enabled, true, "auto enabled")
+	T.eq(menu.spectate.command, "spectate", "spectate command")
+	T.eq(menu.spectate.index, SPEC, "spectate team")
+	T.eq(menu.spectate.enabled, true, "spectate enabled")
+end)
+
+-- CTFTeamMenu::Update: Cancel only once the player has a team
+
+T.test("an unassigned player cannot cancel", function()
+	T.eq(L.TeamMenu(Teams(0, 0), UNASSIGNED, 1, EXTRAS).cancel, false)
+end)
+
+T.test("a player with a team, spectators included, can cancel", function()
+	T.eq(L.TeamMenu(Teams(1, 0), BLU, 1, EXTRAS).cancel, true, "BLU")
+	T.eq(L.TeamMenu(Teams(0, 0), SPEC, 1, EXTRAS).cancel, true, "spectator")
+end)
+
+T.test("the player's own team is marked", function()
+	local menu = L.TeamMenu(Teams(1, 0), BLU, 1, EXTRAS)
+	T.eq(menu.teams[1].current, true, "BLU")
+	T.eq(menu.teams[2].current, false, "RED")
+	T.eq(menu.spectate.current, false, "spectate")
+	T.eq(L.TeamMenu(Teams(0, 0), SPEC, 1, EXTRAS).spectate.current, true, "spectator")
+end)
+
+-- CTFTeamMenu::OnTick: a team is disabled when it is the heavy team or joining it would unbalance
+
+T.test("a team joining would unbalance is disabled with a reason", function()
+	local menu = L.TeamMenu(Teams(0, 1), UNASSIGNED, 1, EXTRAS)
+	local blu, red = menu.teams[1], menu.teams[2]
+	T.eq(red.enabled, false, "RED 2 vs 0")
+	T.eq(red.reason, "Team is full", "reason")
+	T.eq(blu.enabled, true, "BLU 1 vs 1")
+	T.eq(blu.reason, nil, "no reason")
+end)
+
+T.test("leaving your team counts against it", function()
+	-- a BLU player: RED 2 vs BLU 1 is within limit 1
+	local menu = L.TeamMenu(Teams(2, 1), BLU, 1, EXTRAS)
+	T.eq(menu.teams[2].enabled, true)
+end)
+
+T.test("the heavy team is disabled even for its own players", function()
+	local menu = L.TeamMenu(Teams(1, 3), RED, 1, EXTRAS)
+	T.eq(menu.teams[2].enabled, false, "RED is heavy")
+	T.eq(menu.teams[1].enabled, true, "BLU")
+end)
+
+T.test("limit 0 disables no team", function()
+	local menu = L.TeamMenu(Teams(0, 9), UNASSIGNED, 0, EXTRAS)
+	T.eq(menu.teams[2].enabled, true)
+end)
+
+T.test("any number of teams is laid out and checked", function()
+	local teams = {
+		{ index = 2, name = "A", color = "a", count = 2, command = "a" },
+		{ index = 3, name = "B", color = "b", count = 1, command = "b" },
+		{ index = 4, name = "C", color = "c", count = 0, command = "c" },
+	}
+	local menu = L.TeamMenu(teams, UNASSIGNED, 1, {})
+	T.eq(#menu.teams, 3, "three teams")
+	T.eq(menu.teams[1].enabled, false, "A: 3 vs 0")
+	T.eq(menu.teams[2].enabled, false, "B: 2 vs 0")
+	T.eq(menu.teams[3].enabled, true, "C: 1 vs 1")
+end)
+
+-- CTFTeamMenu::ShowPanel: when the menu may open
+
+T.test("the menu opens during a round and for anyone before a team win", function()
+	T.eq(L.TeamMenuAllowed(4, RED, 0), true, "running")
+	T.eq(L.TeamMenuAllowed(4, UNASSIGNED, 0), true, "new player")
+end)
+
+T.test("during a team win only the winners, spectators and the unassigned may open it", function()
+	T.eq(L.TeamMenuAllowed(L.STATE_TEAM_WIN, RED, BLU), false, "loser")
+	T.eq(L.TeamMenuAllowed(L.STATE_TEAM_WIN, BLU, BLU), true, "winner")
+	T.eq(L.TeamMenuAllowed(L.STATE_TEAM_WIN, SPEC, BLU), true, "spectator")
+	T.eq(L.TeamMenuAllowed(L.STATE_TEAM_WIN, UNASSIGNED, BLU), true, "unassigned")
+end)
+
+T.test("nobody opens it once the game is over", function()
+	T.eq(L.TeamMenuAllowed(L.STATE_GAME_OVER, UNASSIGNED, 0), false)
+end)
+
+T.finish()

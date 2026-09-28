@@ -74,6 +74,21 @@ T.test("limit 0 turns balancing off", function()
 	T.eq(L.Unbalanced({ [RED] = 0, [BLU] = 6 }, 0), nil)
 end)
 
+-- Both rules loop over every game team, so they hold for any number of teams.
+
+T.test("joining is checked against every other team", function()
+	local counts = { [2] = 1, [3] = 1, [4] = 0 }
+	T.eq(L.WouldUnbalance(counts, 2, 0, 1), true, "2 vs 0 against team 4")
+	T.eq(L.WouldUnbalance(counts, 4, 0, 1), false, "1 vs 1")
+	T.eq(L.WouldUnbalance(counts, 7, 0, 1), false, "not a game team")
+end)
+
+T.test("the heaviest and lightest of several teams are compared", function()
+	local heavy, light = L.Unbalanced({ [2] = 2, [3] = 4, [4] = 1 }, 1)
+	T.eq(heavy, 3, "heavy")
+	T.eq(light, 4, "light")
+end)
+
 -- BalanceTeams
 
 T.test("switches required is half the difference, rounded down", function()
