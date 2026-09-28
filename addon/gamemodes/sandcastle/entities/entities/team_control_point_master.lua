@@ -5,10 +5,13 @@
 ENT.Type = "point"
 ENT.Base = "base_point"
 
+-- score_style: a team scores per round won, or per point captured.
+local SCORE_PER_ROUND, SCORE_PER_CAPTURE = 0, 1
+
 local KEYS = {
-	cpm_restrict_team_cap_win = function(self, v) self.restrictTeam = tonumber(v) or 0 end,
+	cpm_restrict_team_cap_win = function(self, v) self.restrictTeam = tonumber(v) or WETSAND.TEAM_UNASSIGNED end,
 	switch_teams = function(self, v) self.switchTeams = v == "1" end,
-	score_style = function(self, v) self.scoreStyle = tonumber(v) or 0 end,
+	score_style = function(self, v) self.scoreStyle = tonumber(v) or SCORE_PER_ROUND end,
 	play_all_rounds = function(self, v) self.playAllRounds = v == "1" end,
 	partial_cap_points_rate = function(self, v) self.partialCapRate = tonumber(v) or 0 end,
 	startdisabled = function(self, v) self.disabled = v == "1" end,
@@ -25,9 +28,9 @@ function ENT:KeyValue(key, value)
 end
 
 function ENT:Initialize()
-	self.restrictTeam = self.restrictTeam or 0
+	self.restrictTeam = self.restrictTeam or WETSAND.TEAM_UNASSIGNED
 	self.switchTeams = self.switchTeams or false
-	self.scoreStyle = self.scoreStyle or 0
+	self.scoreStyle = self.scoreStyle or SCORE_PER_ROUND
 	self.playAllRounds = self.playAllRounds or false
 	self.partialCapRate = self.partialCapRate or 0
 	self.disabled = self.disabled or false
@@ -59,7 +62,7 @@ function ENT:CurrentRound()
 end
 
 function ENT:ScorePerCapture()
-	return self.scoreStyle == 1
+	return self.scoreStyle == SCORE_PER_CAPTURE
 end
 
 function ENT:IsInRound(point)
@@ -223,8 +226,8 @@ end
 local INPUTS = {
 	enable = function(self) self.disabled = false end,
 	disable = function(self) self.disabled = true end,
-	setwinner = function(self, value) self:SetWinner(tonumber(value) or 0) end,
-	setwinnerandforcecaps = function(self, value) self:SetWinnerAndForceCaps(tonumber(value) or 0) end,
+	setwinner = function(self, value) self:SetWinner(tonumber(value) or WETSAND.TEAM_UNASSIGNED) end,
+	setwinnerandforcecaps = function(self, value) self:SetWinnerAndForceCaps(tonumber(value) or WETSAND.TEAM_UNASSIGNED) end,
 	roundspawn = function(self) self:RoundSpawn() end,
 	roundactivate = function(self) self:RoundActivate() end,
 	-- The HUD here lays points out along the cart track.

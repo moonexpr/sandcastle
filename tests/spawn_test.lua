@@ -1,7 +1,11 @@
 local T = dofile("tests/harness.lua")
 local S = T.require("foundation.spawn")
 
-local RED, BLU = 2, 3
+local Teams = T.require("foundation.teams")
+local NO_POINT = T.require("foundation.rounds").NO_POINT
+
+local NOBODY, RED, BLU = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
+local KV = tostring -- the map gives keyvalues as text
 
 local function Spawn(t)
 	return S.FromKeyValues(t)
@@ -10,42 +14,42 @@ end
 -- CTFTeamSpawn keyvalues
 
 T.test("a teamspawn record reads TF2's keyvalues", function()
-	local s = Spawn({ teamnum = "3", startdisabled = "1", controlpoint = "cap_a", round_bluespawn = "round_a", round_redspawn = "", spawnmode = "1", matchsummary = "2" })
+	local s = Spawn({ teamnum = KV(BLU), startdisabled = "1", controlpoint = "cap_a", round_bluespawn = "round_a", round_redspawn = "", spawnmode = KV(S.SPAWN_MODE_TRIGGERED), matchsummary = KV(S.MATCH_SUMMARY_WINNER) })
 	T.eq(s.team, BLU, "team")
 	T.eq(s.disabled, true, "disabled")
 	T.eq(s.controlpoint, "cap_a", "controlpoint")
 	T.eq(s.roundBlue, "round_a", "blue round")
 	T.eq(s.roundRed, nil, "empty red round")
-	T.eq(s.spawnMode, 1, "spawn mode")
-	T.eq(s.matchSummary, 2, "match summary")
+	T.eq(s.spawnMode, S.SPAWN_MODE_TRIGGERED, "spawn mode")
+	T.eq(s.matchSummary, S.MATCH_SUMMARY_WINNER, "match summary")
 end)
 
 T.test("a teamspawn with no keys is enabled on no team", function()
 	local s = Spawn({})
-	T.eq(s.team, 0, "team")
+	T.eq(s.team, NOBODY, "team")
 	T.eq(s.disabled, false, "disabled")
-	T.eq(s.spawnMode, 0, "mode")
-	T.eq(s.matchSummary, 0, "summary")
+	T.eq(s.spawnMode, S.SPAWN_MODE_NORMAL, "mode")
+	T.eq(s.matchSummary, S.MATCH_SUMMARY_NONE, "summary")
 end)
 
 -- CTFGameRules::IsSpawnPointValid
 
 T.test("a spawn is valid for its team when enabled, normal and not a podium", function()
-	T.eq(S.Valid(Spawn({ teamnum = "2" }), RED), true, "plain")
-	T.eq(S.Valid(Spawn({ teamnum = "2" }), BLU), false, "other team")
-	T.eq(S.Valid(Spawn({ teamnum = "2", startdisabled = "1" }), RED), false, "disabled")
-	T.eq(S.Valid(Spawn({ teamnum = "2", spawnmode = "1" }), RED), false, "triggered")
-	T.eq(S.Valid(Spawn({ teamnum = "2", matchsummary = "1" }), RED), false, "podium")
+	T.eq(S.Valid(Spawn({ teamnum = KV(RED) }), RED), true, "plain")
+	T.eq(S.Valid(Spawn({ teamnum = KV(RED) }), BLU), false, "other team")
+	T.eq(S.Valid(Spawn({ teamnum = KV(RED), startdisabled = "1" }), RED), false, "disabled")
+	T.eq(S.Valid(Spawn({ teamnum = KV(RED), spawnmode = KV(S.SPAWN_MODE_TRIGGERED) }), RED), false, "triggered")
+	T.eq(S.Valid(Spawn({ teamnum = KV(RED), matchsummary = KV(S.MATCH_SUMMARY_LOSER) }), RED), false, "podium")
 end)
 
 -- CTFGameRules::SetupSpawnPointsForRound, as pl_goldrush and plr_hightower use it
 
 local function GoldrushSpawns()
 	return {
-		Spawn({ teamnum = "0", controlpoint = "cap_a_2", round_bluespawn = "round_b", round_redspawn = "round_a" }),
-		Spawn({ teamnum = "3", round_bluespawn = "round_a" }),
-		Spawn({ teamnum = "2", startdisabled = "1", round_redspawn = "round_c" }),
-		Spawn({ teamnum = "2", startdisabled = "1" }),
+		Spawn({ teamnum = KV(NOBODY), controlpoint = "cap_a_2", round_bluespawn = "round_b", round_redspawn = "round_a" }),
+		Spawn({ teamnum = KV(BLU), round_bluespawn = "round_a" }),
+		Spawn({ teamnum = KV(RED), startdisabled = "1", round_redspawn = "round_c" }),
+		Spawn({ teamnum = KV(RED), startdisabled = "1" }),
 	}
 end
 
@@ -73,7 +77,7 @@ end)
 
 T.test("a red round spawn is moved to RED whatever its keyvalue team", function()
 	-- plr_hightower's RED spawns are TeamNum 3 with round_redspawn set.
-	local spawns = { Spawn({ teamnum = "3", round_redspawn = "plr_round_C" }) }
+	local spawns = { Spawn({ teamnum = KV(BLU), round_redspawn = "plr_round_C" }) }
 	S.SetupForRound(spawns, "plr_round_C", {}, Owner)
 	T.eq(spawns[1].team, RED, "RED")
 	T.eq(spawns[1].disabled, false, "on")
@@ -102,21 +106,21 @@ T.test("the base point is the end of the line a team owns by default", function(
 	local points = Points({ { default = RED }, { default = RED }, { default = BLU } })
 	T.eq(S.BaseControlPoint(points, RED), 0, "RED holds the low end")
 	T.eq(S.BaseControlPoint(points, BLU), 2, "BLU holds the high end")
-	T.eq(S.BaseControlPoint(Points({ { default = 0 }, { default = 0 } }), RED), -1, "nobody")
+	T.eq(S.BaseControlPoint(Points({ { default = NOBODY }, { default = NOBODY } }), RED), NO_POINT, "nobody")
 end)
 
 T.test("the farthest owned point with spawns is where a team spawns", function()
 	local points = Points({
 		{ default = RED, owner = RED },
-		{ default = 0, owner = RED },
-		{ default = 0, owner = RED },
+		{ default = NOBODY, owner = RED },
+		{ default = NOBODY, owner = RED },
 		{ default = BLU, owner = BLU },
 	})
 	local spawns = {
-		Spawn({ teamnum = "2", controlpoint = "cp0" }),
-		Spawn({ teamnum = "2", controlpoint = "cp1" }),
-		Spawn({ teamnum = "3", controlpoint = "cp3" }),
-		Spawn({ teamnum = "2" }),
+		Spawn({ teamnum = KV(RED), controlpoint = "cp0" }),
+		Spawn({ teamnum = KV(RED), controlpoint = "cp1" }),
+		Spawn({ teamnum = KV(BLU), controlpoint = "cp3" }),
+		Spawn({ teamnum = KV(RED) }),
 	}
 	local controlSpawns = S.StartControlPointSpawns(spawns, IndexOf(points))
 	T.eq(spawns[1].disabled, true, "linked spawns start off")
@@ -130,8 +134,8 @@ T.test("the farthest owned point with spawns is where a team spawns", function()
 end)
 
 T.test("losing a point moves a team's spawn back", function()
-	local points = Points({ { default = RED, owner = RED }, { default = 0, owner = BLU }, { default = BLU, owner = BLU } })
-	local spawns = { Spawn({ teamnum = "2", controlpoint = "cp0" }), Spawn({ teamnum = "2", controlpoint = "cp1" }) }
+	local points = Points({ { default = RED, owner = RED }, { default = NOBODY, owner = BLU }, { default = BLU, owner = BLU } })
+	local spawns = { Spawn({ teamnum = KV(RED), controlpoint = "cp0" }), Spawn({ teamnum = KV(RED), controlpoint = "cp1" }) }
 	local controlSpawns = S.StartControlPointSpawns(spawns, IndexOf(points))
 	S.RecalculateControlPointState(spawns, points, controlSpawns, IndexOf(points))
 	T.eq(spawns[1].disabled, false, "base spawn")
@@ -142,7 +146,7 @@ end)
 -- first a clear spot, then any valid one
 
 T.test("spawns are handed out in turn after the last one used", function()
-	local spawns = { Spawn({ teamnum = "2" }), Spawn({ teamnum = "3" }), Spawn({ teamnum = "2" }), Spawn({ teamnum = "2" }) }
+	local spawns = { Spawn({ teamnum = KV(RED) }), Spawn({ teamnum = KV(BLU) }), Spawn({ teamnum = KV(RED) }), Spawn({ teamnum = KV(RED) }) }
 	local clear = function() return true end
 	T.eq(S.Pick(spawns, RED, nil, clear), 1, "first")
 	T.eq(S.Pick(spawns, RED, 1, clear), 3, "skips BLU")
@@ -150,13 +154,13 @@ T.test("spawns are handed out in turn after the last one used", function()
 end)
 
 T.test("an occupied spot is skipped while a clear one exists", function()
-	local spawns = { Spawn({ teamnum = "2" }), Spawn({ teamnum = "2" }) }
+	local spawns = { Spawn({ teamnum = KV(RED) }), Spawn({ teamnum = KV(RED) }) }
 	T.eq(S.Pick(spawns, RED, nil, function(i) return i ~= 1 end), 2, "clear one")
 	T.eq(S.Pick(spawns, RED, nil, function() return false end), 1, "all occupied")
 end)
 
 T.test("no valid spawn gives nil", function()
-	T.eq(S.Pick({ Spawn({ teamnum = "3" }) }, RED, nil, function() return true end), nil)
+	T.eq(S.Pick({ Spawn({ teamnum = KV(BLU) }) }, RED, nil, function() return true end), nil)
 end)
 
 T.finish()

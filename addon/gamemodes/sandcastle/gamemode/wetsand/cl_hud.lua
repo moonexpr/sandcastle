@@ -2,6 +2,8 @@
 -- countdown, alarm, both carts in payload race), timed captures,
 -- announcements, respawn countdown.
 
+local Payload = WETSAND.require("foundation.payload")
+
 surface.CreateFont("TF2Ents.Timer", { font = "Roboto", size = 34, weight = 800 })
 surface.CreateFont("TF2Ents.Label", { font = "Roboto", size = 18, weight = 700 })
 surface.CreateFont("TF2Ents.Announce", { font = "Roboto", size = 42, weight = 900 })
@@ -75,7 +77,7 @@ end
 local function Cart(i)
 	local key = "tf2.cart." .. i .. "."
 	return {
-		team = GetGlobal2Int(key .. "team", 0),
+		team = GetGlobal2Int(key .. "team", WETSAND.TEAM_UNASSIGNED),
 		progress = GetGlobal2Float(key .. "progress", 0),
 		speed = GetGlobal2Int(key .. "speed", 0),
 		cappers = GetGlobal2Int(key .. "cappers", 0),
@@ -90,7 +92,7 @@ end
 
 -- Speed arrows (the train's speed level), pushers, block, or the rollback countdown.
 local function CartStatus(cart)
-	if cart.cappers == -1 then return "BLOCKED" end
+	if cart.cappers == Payload.CAPPERS_BLOCKED then return "BLOCKED" end
 	local parts = {}
 	if cart.speed > 0 then parts[#parts + 1] = string.rep(">", cart.speed) end
 	if cart.speed < 0 then parts[#parts + 1] = "<" end
@@ -109,11 +111,11 @@ local function DrawTrack(cart, x, y, barW, barH)
 		surface.SetDrawColor(c.r, c.g, c.b, 255)
 		surface.DrawRect(x + barW * hill.from, y + barH - 4, barW * math.max(hill.to - hill.from, 0), 4)
 	end
-	local tc = WETSAND.TeamColor[cart.team] or WETSAND.TeamColor[0]
+	local tc = WETSAND.TeamColor[cart.team] or WETSAND.TeamColor[WETSAND.TEAM_UNASSIGNED]
 	surface.SetDrawColor(tc.r, tc.g, tc.b, 255)
 	surface.DrawRect(x, y, barW * cart.progress, barH - 4)
 	for i, fraction in ipairs(cart.cps) do
-		local c = WETSAND.TeamColor[cart.owners[i] or 0] or WETSAND.TeamColor[0]
+		local c = WETSAND.TeamColor[cart.owners[i] or WETSAND.TEAM_UNASSIGNED] or WETSAND.TeamColor[WETSAND.TEAM_UNASSIGNED]
 		draw.RoundedBox(4, x + barW * fraction - 7, y - 4, 14, barH + 8, c)
 	end
 end
@@ -159,8 +161,8 @@ local function Capture(i)
 	local key = "tf2.cap." .. i .. "."
 	return {
 		index = GetGlobal2Int(key .. "index", 0),
-		owner = GetGlobal2Int(key .. "owner", 0),
-		capping = GetGlobal2Int(key .. "capping", 0),
+		owner = GetGlobal2Int(key .. "owner", WETSAND.TEAM_UNASSIGNED),
+		capping = GetGlobal2Int(key .. "capping", WETSAND.TEAM_UNASSIGNED),
 		progress = GetGlobal2Float(key .. "progress", 0),
 		blocked = GetGlobal2Bool(key .. "blocked", false),
 		cappers = GetGlobal2Int(key .. "cappers", 0),
@@ -168,11 +170,11 @@ local function Capture(i)
 end
 
 local function DrawCapture(cap, x, y, size)
-	local owner = WETSAND.TeamColor[cap.owner] or WETSAND.TeamColor[0]
+	local owner = WETSAND.TeamColor[cap.owner] or WETSAND.TeamColor[WETSAND.TEAM_UNASSIGNED]
 	draw.RoundedBox(6, x, y, size, size, Color(0, 0, 0, 170))
 	draw.RoundedBox(4, x + 4, y + 4, size - 8, size - 8, Color(owner.r, owner.g, owner.b, 200))
 	draw.SimpleText(tostring(cap.index + 1), "TF2Ents.Timer", x + size / 2, y + size / 2 - 4, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	if cap.capping == 0 then return end
+	if cap.capping == WETSAND.TEAM_UNASSIGNED then return end
 	local c = WETSAND.TeamColor[cap.capping] or color_white
 	surface.SetDrawColor(20, 20, 20, 255)
 	surface.DrawRect(x + 4, y + size - 12, size - 8, 8)

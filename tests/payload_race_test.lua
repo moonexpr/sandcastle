@@ -2,17 +2,19 @@
 local T = dofile("tests/harness.lua")
 local R = T.require("foundation.payload.race")
 
-local RED, BLU = 2, 3
+local Teams = T.require("foundation.teams")
+
+local NOBODY, RED, BLU = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
 
 T.test("the leader is the cart farther along its track", function()
 	T.eq(R.Leader({ [RED] = 900, [BLU] = 400 }), RED)
 	T.eq(R.Leader({ [RED] = 100, [BLU] = 400 }), BLU)
-	T.eq(R.Leader({ [RED] = 400, [BLU] = 400 }), 0)
+	T.eq(R.Leader({ [RED] = 400, [BLU] = 400 }), NOBODY)
 end)
 
 T.test("a missing cart counts as not started", function()
 	T.eq(R.Leader({ [BLU] = 10 }), BLU)
-	T.eq(R.Leader({}), 0)
+	T.eq(R.Leader({}), NOBODY)
 end)
 
 T.test("a stage win plays the first-stage outcome lines", function()
@@ -28,7 +30,7 @@ T.test("the full-round win plays the final-stage outcome lines", function()
 end)
 
 T.test("a stalemate plays no outcome lines", function()
-	T.eq(next(R.OutcomeLines(0, true)), nil)
+	T.eq(next(R.OutcomeLines(NOBODY, true)), nil)
 end)
 
 T.test("every announcer line the SDK names maps to its mp3", function()

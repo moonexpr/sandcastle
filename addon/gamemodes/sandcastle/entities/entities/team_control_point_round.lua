@@ -12,7 +12,7 @@ function ENT:KeyValue(key, value)
 	elseif k == "cpr_priority" then
 		self.priority = tonumber(value) or 0
 	elseif k == "cpr_restrict_team_cap_win" then
-		self.restrictTeam = tonumber(value) or 0
+		self.restrictTeam = tonumber(value) or WETSAND.TEAM_UNASSIGNED
 	elseif k == "cpr_printname" then
 		self.printName = value
 	elseif k == "startdisabled" then

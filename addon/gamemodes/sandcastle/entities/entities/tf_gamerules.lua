@@ -34,6 +34,11 @@ local PREROUND_SECONDS = 3
 -- spec_freeze_traveltime (0.4) and spec_freeze_time (4).
 local DEATH_ANIM_LENGTH = 2.0 + 0.4 + 4.0
 local OPTIMAL_TEAM_SIZE = 8
+local RED, BLUE = WETSAND.TEAM_RED, WETSAND.TEAM_BLUE
+local WAVE_TIME_UNSET = -1 -- m_TeamRespawnWaveTimes before a map input sets one
+local ROLE_NONE = 0 -- TEAM_ROLE_NONE
+-- CTFGameRules::GetRespawnWaveMaxLength: small teams never shorten a wave below this.
+local MIN_SCALED_WAVE = 5
 
 local TIMELIMIT_TIMER_NAME = "zz_teamplay_timelimit_timer"
 
@@ -46,9 +51,9 @@ end
 function ENT:Initialize()
 	WETSAND.Rules = self
 	SetGlobal2Bool("tf2.active", true)
-	self.waveTime = { [2] = -1, [3] = -1 }
-	self.originalWaveTime = { [2] = -1, [3] = -1 }
-	self.nextWave = { [2] = 0, [3] = 0 }
+	self.waveTime = { [RED] = WAVE_TIME_UNSET, [BLUE] = WAVE_TIME_UNSET }
+	self.originalWaveTime = { [RED] = WAVE_TIME_UNSET, [BLUE] = WAVE_TIME_UNSET }
+	self.nextWave = { [RED] = 0, [BLUE] = 0 }
 	self.goalString = {}
 	self.role = {}
 	self.roundsPlayed = 0
@@ -155,7 +160,7 @@ end
 
 -- Team1PlayersChanged / Team2PlayersChanged (CTFGameRulesProxy::TeamPlayerCountChanged).
 function ENT:CheckTeamCounts()
-	for team, output in pairs({ [2] = "Team1PlayersChanged", [3] = "Team2PlayersChanged" }) do
+	for team, output in pairs({ [RED] = "Team1PlayersChanged", [BLUE] = "Team2PlayersChanged" }) do
 		local n = #self:TeamPlayers(team)
 		if self.teamCounts[team] ~= n then
 			self.teamCounts[team] = n
@@ -165,7 +170,7 @@ function ENT:CheckTeamCounts()
 end
 
 function ENT:Scores()
-	return { [2] = team.GetScore(WETSAND.TEAM_RED), [3] = team.GetScore(WETSAND.TEAM_BLUE) }
+	return { [RED] = team.GetScore(RED), [BLUE] = team.GetScore(BLUE) }
 end
 
 -- PREGAME --------------------------------------------------------------------------------
@@ -202,7 +207,7 @@ end
 -- PlayStartRoundVoice names Game.TeamRoundStart2/3, which no soundscript
 -- defines, so it is silent there too.
 function ENT:StateEnter_RND_RUNNING()
-	self.nextWave = { [2] = 0, [3] = 0 }
+	self.nextWave = { [RED] = 0, [BLUE] = 0 }
 	self:TriggerOutput("OnStateEnterRoundRunning", self)
 	hook.Run("TF2RoundActive")
 end
@@ -430,7 +435,7 @@ end
 -- cleans the map up; a mini-round keeps it as it is.
 function ENT:RoundRespawn()
 	self.roundStartTime = CurTime()
-	SetGlobal2Int("tf2.winner", 0)
+	SetGlobal2Int("tf2.winner", WETSAND.TEAM_UNASSIGNED)
 	if self.forceMapReset then
 		if not self.mapFresh then game.CleanUpMap(false, { "tf_gamerules" }) end
 		self.mapFresh = false
@@ -535,8 +540,8 @@ end
 function ENT:GetRespawnWaveMaxLength(team, scaleWithNumPlayers)
 	if self.state ~= S.RND_RUNNING then return 0 end
 	local t = self.waveTime[team] >= 0 and self.waveTime[team] or respawnwavetime:GetFloat()
-	if scaleWithNumPlayers and t > 5 then
-		t = math.max(5, t * self:GetRespawnTimeScalar(team))
+	if scaleWithNumPlayers and t > MIN_SCALED_WAVE then
+		t = math.max(MIN_SCALED_WAVE, t * self:GetRespawnTimeScalar(team))
 	end
 	return t
 end
@@ -622,7 +627,7 @@ end
 
 local function RoleSetter(team)
 	return function(self, value)
-		self.role[team] = tonumber(value) or 0
+		self.role[team] = tonumber(value) or ROLE_NONE
 		SetGlobal2Int("tf2.round.role" .. team, self.role[team])
 	end
 end
@@ -630,16 +635,16 @@ end
 local function Ignore() end
 
 local INPUTS = {
-	setredteamrespawnwavetime = function(self, v) self:SetTeamRespawnWaveTime(2, tonumber(v) or 0) end,
-	setblueteamrespawnwavetime = function(self, v) self:SetTeamRespawnWaveTime(3, tonumber(v) or 0) end,
-	addredteamrespawnwavetime = function(self, v) self:AddTeamRespawnWaveTime(2, tonumber(v) or 0) end,
-	addblueteamrespawnwavetime = function(self, v) self:AddTeamRespawnWaveTime(3, tonumber(v) or 0) end,
-	setredteamgoalstring = GoalSetter(2),
-	setblueteamgoalstring = GoalSetter(3),
-	setredteamrole = RoleSetter(2),
-	setblueteamrole = RoleSetter(3),
-	addredteamscore = function(self, v) team.AddScore(WETSAND.TEAM_RED, tonumber(v) or 0) end,
-	addblueteamscore = function(self, v) team.AddScore(WETSAND.TEAM_BLUE, tonumber(v) or 0) end,
+	setredteamrespawnwavetime = function(self, v) self:SetTeamRespawnWaveTime(RED, tonumber(v) or 0) end,
+	setblueteamrespawnwavetime = function(self, v) self:SetTeamRespawnWaveTime(BLUE, tonumber(v) or 0) end,
+	addredteamrespawnwavetime = function(self, v) self:AddTeamRespawnWaveTime(RED, tonumber(v) or 0) end,
+	addblueteamrespawnwavetime = function(self, v) self:AddTeamRespawnWaveTime(BLUE, tonumber(v) or 0) end,
+	setredteamgoalstring = GoalSetter(RED),
+	setblueteamgoalstring = GoalSetter(BLUE),
+	setredteamrole = RoleSetter(RED),
+	setblueteamrole = RoleSetter(BLUE),
+	addredteamscore = function(self, v) team.AddScore(RED, tonumber(v) or 0) end,
+	addblueteamscore = function(self, v) team.AddScore(BLUE, tonumber(v) or 0) end,
 	setrequiredobservertarget = function(self, v) WETSAND.SetRequiredObserverTarget(tostring(v or "")) end,
 	setstalemateontimelimit = function(self, v)
 		self.allowStalemateAtTimelimit = tonumber(v) == 1 or tostring(v) == "true"

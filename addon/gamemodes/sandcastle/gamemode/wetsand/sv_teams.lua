@@ -99,7 +99,7 @@ end
 -- CTFTeamMenu::ShowPanel refuses to open during game over, and for a
 -- losing player while the winners celebrate.
 function WETSAND.ShowTeamMenu(ply)
-	if not L.TeamMenuAllowed(WETSAND.State(), ply:Team(), GetGlobal2Int("tf2.winner", 0)) then
+	if not L.TeamMenuAllowed(WETSAND.State(), ply:Team(), GetGlobal2Int("tf2.winner", WETSAND.TEAM_UNASSIGNED)) then
 		ply:PrintMessage(HUD_PRINTCENTER, "You can't change team at this time.")
 		return
 	end

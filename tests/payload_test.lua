@@ -1,6 +1,10 @@
 -- foundation.payload: the team_train_watcher's decisions (team_train_watcher.cpp).
 local T = dofile("tests/harness.lua")
 local P = T.require("foundation.payload")
+local Teams = T.require("foundation.teams")
+local NEITHER = T.require("foundation.rounds").RESTRICT_NEITHER
+
+local NOBODY, RED, BLU = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
 
 -- HandleTrainMovement -----------------------------------------------------------
 
@@ -20,9 +24,9 @@ T.test("pushers on a downhill run at full speed", function()
 end)
 
 T.test("a blocked cart stops unless it is on a downhill", function()
-	T.eq(Speed(-1, P.HILL_NONE, 0.55, false), 0)
-	T.eq(Speed(-1, P.HILL_UP, 0.55, false), 0)
-	T.eq(Speed(-1, P.HILL_DOWN, 0.55, false), 1.0)
+	T.eq(Speed(P.CAPPERS_BLOCKED, P.HILL_NONE, 0.55, false), 0)
+	T.eq(Speed(P.CAPPERS_BLOCKED, P.HILL_UP, 0.55, false), 0)
+	T.eq(Speed(P.CAPPERS_BLOCKED, P.HILL_DOWN, 0.55, false), 1.0)
 end)
 
 T.test("an unpushed cart moving forward stops, or keeps rolling downhill", function()
@@ -55,7 +59,7 @@ T.test("a receding cart with nobody pushing keeps receding, even downhill", func
 end)
 
 T.test("a forward speed clears receding even with nobody pushing", function()
-	local speed, receding = Speed(-1, P.HILL_DOWN, -0.1, true)
+	local speed, receding = Speed(P.CAPPERS_BLOCKED, P.HILL_DOWN, -0.1, true)
 	T.eq(speed, 1.0)
 	T.eq(receding, false)
 end)
@@ -73,8 +77,8 @@ T.test("speed levels split at hud_min_speed_level_1..3", function()
 	T.eq(P.SpeedLevel(90, 90, LEVELS), 3)
 end)
 
-T.test("moving backwards is level -1, unless stopped at a dead end", function()
-	T.eq(P.SpeedLevel(-20, -20, LEVELS), -1)
+T.test("moving backwards is the backwards level, unless stopped at a dead end", function()
+	T.eq(P.SpeedLevel(-20, -20, LEVELS), P.SPEED_LEVEL_BACKWARDS)
 	T.eq(P.SpeedLevel(-20, 0, LEVELS), 0)
 end)
 
@@ -208,6 +212,8 @@ end)
 
 -- Hill data for the HUD (WatcherActivate) --------------------------------------------
 
+local FLAT, UP, DOWN = P.HILL_NONE, P.HILL_UP, P.HILL_DOWN
+
 local function Nodes(spec)
 	local nodes, d = {}, 0
 	for i, s in ipairs(spec) do
@@ -218,11 +224,11 @@ local function Nodes(spec)
 end
 
 T.test("no hills on a flat track", function()
-	T.eq(#P.HillSegments(Nodes({ 0, 0, 0, 0 }), 300), 0)
+	T.eq(#P.HillSegments(Nodes({ FLAT, FLAT, FLAT, FLAT }), 300), 0)
 end)
 
 T.test("an uphill run is reported from its first node to the node before it ends", function()
-	local hills = P.HillSegments(Nodes({ 0, 0, 1, 1, 0, 0 }), 500)
+	local hills = P.HillSegments(Nodes({ FLAT, FLAT, UP, UP, FLAT, FLAT }), 500)
 	T.eq(#hills, 1)
 	T.near(hills[1].from, 200 / 500 + 0.005)
 	T.near(hills[1].to, 300 / 500 - 0.005)
@@ -230,7 +236,7 @@ T.test("an uphill run is reported from its first node to the node before it ends
 end)
 
 T.test("a single hill node reaches to the next node", function()
-	local hills = P.HillSegments(Nodes({ 0, 2, 0, 0 }), 300)
+	local hills = P.HillSegments(Nodes({ FLAT, DOWN, FLAT, FLAT }), 300)
 	T.eq(#hills, 1)
 	T.near(hills[1].from, 100 / 300 + 0.005)
 	T.near(hills[1].to, 200 / 300 - 0.005)
@@ -238,13 +244,13 @@ T.test("a single hill node reaches to the next node", function()
 end)
 
 T.test("a hill running to the goal ends at the path's end", function()
-	local hills = P.HillSegments(Nodes({ 0, 0, 1, 1 }), 300)
+	local hills = P.HillSegments(Nodes({ FLAT, FLAT, UP, UP }), 300)
 	T.eq(#hills, 1)
 	T.near(hills[1].to, 1 - 0.005)
 end)
 
 T.test("an uphill straight into a downhill makes two hills", function()
-	local hills = P.HillSegments(Nodes({ 0, 1, 1, 2, 2, 0 }), 500)
+	local hills = P.HillSegments(Nodes({ FLAT, UP, UP, DOWN, DOWN, FLAT }), 500)
 	T.eq(#hills, 2)
 	T.eq(hills[1].down, false)
 	T.eq(hills[2].down, true)
@@ -260,36 +266,36 @@ local function Points(...)
 end
 
 T.test("TeamOwnsAllPoints: one owner of every point, else nobody", function()
-	T.eq(P.TeamOwnsAllPoints(Points(3, 3, 3)), 3)
-	T.eq(P.TeamOwnsAllPoints(Points(3, 2, 3)), 0)
-	T.eq(P.TeamOwnsAllPoints(Points(0, 0)), 0)
+	T.eq(P.TeamOwnsAllPoints(Points(BLU, BLU, BLU)), BLU)
+	T.eq(P.TeamOwnsAllPoints(Points(BLU, RED, BLU)), NOBODY)
+	T.eq(P.TeamOwnsAllPoints(Points(NOBODY, NOBODY)), NOBODY)
 end)
 
 T.test("TeamOwnsAllPoints with an override predicts a capture", function()
-	T.eq(P.TeamOwnsAllPoints(Points(3, 3, 2), 3, 3), 3)
-	T.eq(P.TeamOwnsAllPoints(Points(3, 2, 2), 3, 3), 0)
+	T.eq(P.TeamOwnsAllPoints(Points(BLU, BLU, RED), 3, BLU), BLU)
+	T.eq(P.TeamOwnsAllPoints(Points(BLU, RED, RED), 3, BLU), NOBODY)
 end)
 
 T.test("TeamOwnsAllPoints: any fully owned group wins", function()
-	local points = { { group = 0, owner = 2 }, { group = 0, owner = 3 }, { group = 1, owner = 3 } }
-	T.eq(P.TeamOwnsAllPoints(points), 3)
+	local points = { { group = 0, owner = RED }, { group = 0, owner = BLU }, { group = 1, owner = BLU } }
+	T.eq(P.TeamOwnsAllPoints(points), BLU)
 end)
 
 T.test("a round is unplayable once a team that may win it owns every point", function()
-	T.eq(P.IsPlayable(Points(2, 2), 2), true)
-	T.eq(P.IsPlayable(Points(3, 3), 2), false)
-	T.eq(P.IsPlayable(Points(3, 3), 1), true)
-	T.eq(P.IsPlayable(Points(3, 2), 0), true)
+	T.eq(P.IsPlayable(Points(RED, RED), RED), true)
+	T.eq(P.IsPlayable(Points(BLU, BLU), RED), false)
+	T.eq(P.IsPlayable(Points(BLU, BLU), NEITHER), true)
+	T.eq(P.IsPlayable(Points(BLU, RED), NOBODY), true)
 end)
 
 T.test("final point without mini-rounds: capturing it would win", function()
-	T.eq(P.FinalPoint(false, 0, Points(3, 3, 2), 3, { 3 }), true)
-	T.eq(P.FinalPoint(false, 0, Points(3, 2, 2), 2, { 3 }), false)
+	T.eq(P.FinalPoint(false, 0, Points(BLU, BLU, RED), 3, { BLU }), true)
+	T.eq(P.FinalPoint(false, 0, Points(BLU, RED, RED), 2, { BLU }), false)
 end)
 
 T.test("final point with mini-rounds: only in the last playable round", function()
-	T.eq(P.FinalPoint(true, 2, Points(3, 2), 2, { 3 }), false)
-	T.eq(P.FinalPoint(true, 1, Points(3, 2), 2, { 3 }), true)
+	T.eq(P.FinalPoint(true, 2, Points(BLU, RED), 2, { BLU }), false)
+	T.eq(P.FinalPoint(true, 1, Points(BLU, RED), 2, { BLU }), true)
 end)
 
 T.finish()

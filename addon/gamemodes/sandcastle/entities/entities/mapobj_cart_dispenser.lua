@@ -5,6 +5,7 @@
 ENT.Type = "point"
 ENT.Base = "base_point"
 
+local FIRST_LEVEL, MAX_LEVEL = 1, 3         -- the dispenser's upgrade levels, indexing the rates
 local HEAL_RATES = { 10.0, 15.0, 20.0 } -- g_flDispenserHealRates, health per second
 local AMMO_RATES = { 0.2, 0.3, 0.4 }    -- g_flDispenserAmmoRates, of each reserve per dose
 local AMMO_INTERVAL = 1.0               -- after someone took ammo
@@ -30,7 +31,7 @@ end
 function ENT:Initialize()
 	self.team = tonumber(self:Key("teamnum", WETSAND.TEAM_RED)) or WETSAND.TEAM_RED
 	self.spawnflags = tonumber(self:Key("spawnflags", 0)) or 0
-	self.level = 1
+	self.level = FIRST_LEVEL
 	self.disabled = false
 	self.healCarry = setmetatable({}, { __mode = "k" })
 	-- OnGoActive: the first dose half a second after it goes active
@@ -113,7 +114,7 @@ local INPUTS = {
 	hide = function(self) self.disabled = true end,
 	setdispenserlevel = function(self, value)
 		local level = tonumber(value)
-		if level and level >= 1 and level <= 3 then self.level = level end
+		if level and level >= FIRST_LEVEL and level <= MAX_LEVEL then self.level = level end
 	end,
 	setteam = function(self, value) self.team = tonumber(value) or self.team end,
 	-- Accepted with no effect: GMod has no TF2 conditions for the Halloween

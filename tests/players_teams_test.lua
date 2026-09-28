@@ -1,7 +1,9 @@
 local T = dofile("tests/harness.lua")
 local L = T.require("foundation.teams")
 
-local RED, BLU, SPEC = 2, 3, 1
+local STATE = T.require("foundation.rounds.state")
+
+local UNASSIGNED, SPEC, RED, BLU = L.UNASSIGNED, L.SPECTATOR, L.RED, L.BLUE
 
 -- jointeam (CTFPlayer::HandleCommand_JoinTeam)
 
@@ -12,7 +14,7 @@ T.test("jointeam names resolve case-insensitively", function()
 	T.eq(L.ParseJoinTeam("spectate"), SPEC, "spectate")
 	T.eq(L.ParseJoinTeam("spectatearena"), SPEC, "spectatearena")
 	T.eq(L.ParseJoinTeam("auto"), L.AUTO, "auto")
-	T.eq(L.ParseJoinTeam("unassigned"), 0, "unassigned")
+	T.eq(L.ParseJoinTeam("unassigned"), UNASSIGNED, "unassigned")
 end)
 
 T.test("jointeam accepts blu as Blue", function()
@@ -42,8 +44,8 @@ T.test("joining your own team never unbalances", function()
 end)
 
 T.test("joining the bigger team past the limit is refused", function()
-	T.eq(L.WouldUnbalance({ [RED] = 1, [BLU] = 0 }, RED, 0, 1), true, "2 vs 0")
-	T.eq(L.WouldUnbalance({ [RED] = 0, [BLU] = 0 }, RED, 0, 1), false, "1 vs 0")
+	T.eq(L.WouldUnbalance({ [RED] = 1, [BLU] = 0 }, RED, UNASSIGNED, 1), true, "2 vs 0")
+	T.eq(L.WouldUnbalance({ [RED] = 0, [BLU] = 0 }, RED, UNASSIGNED, 1), false, "1 vs 0")
 end)
 
 T.test("leaving a team counts against it", function()
@@ -55,7 +57,7 @@ end)
 
 T.test("spectator is always allowed, and limit 0 disables the check", function()
 	T.eq(L.WouldUnbalance({ [RED] = 5, [BLU] = 0 }, SPEC, RED, 1), false, "spec")
-	T.eq(L.WouldUnbalance({ [RED] = 5, [BLU] = 0 }, RED, 0, 0), false, "limit 0")
+	T.eq(L.WouldUnbalance({ [RED] = 5, [BLU] = 0 }, RED, UNASSIGNED, 0), false, "limit 0")
 end)
 
 -- AreTeamsUnbalanced
@@ -75,18 +77,19 @@ T.test("limit 0 turns balancing off", function()
 end)
 
 -- Both rules loop over every game team, so they hold for any number of teams.
+local THIRD, NOT_PLAYING = 4, 7 -- a game team TF2 lacks, and a team that is not in counts
 
 T.test("joining is checked against every other team", function()
-	local counts = { [2] = 1, [3] = 1, [4] = 0 }
-	T.eq(L.WouldUnbalance(counts, 2, 0, 1), true, "2 vs 0 against team 4")
-	T.eq(L.WouldUnbalance(counts, 4, 0, 1), false, "1 vs 1")
-	T.eq(L.WouldUnbalance(counts, 7, 0, 1), false, "not a game team")
+	local counts = { [RED] = 1, [BLU] = 1, [THIRD] = 0 }
+	T.eq(L.WouldUnbalance(counts, RED, UNASSIGNED, 1), true, "2 vs 0 against the third team")
+	T.eq(L.WouldUnbalance(counts, THIRD, UNASSIGNED, 1), false, "1 vs 1")
+	T.eq(L.WouldUnbalance(counts, NOT_PLAYING, UNASSIGNED, 1), false, "not a game team")
 end)
 
 T.test("the heaviest and lightest of several teams are compared", function()
-	local heavy, light = L.Unbalanced({ [2] = 2, [3] = 4, [4] = 1 }, 1)
-	T.eq(heavy, 3, "heavy")
-	T.eq(light, 4, "light")
+	local heavy, light = L.Unbalanced({ [RED] = 2, [BLU] = 4, [THIRD] = 1 }, 1)
+	T.eq(heavy, BLU, "heavy")
+	T.eq(light, THIRD, "light")
 end)
 
 -- BalanceTeams
@@ -130,19 +133,19 @@ end)
 -- CFilterTFTeam::PassesFilterImpl, with CBaseFilter::PassesFilter's negation
 
 T.test("team filter passes its own team", function()
-	T.eq(L.FilterPasses(RED, false, RED, 4, 0), true, "match")
-	T.eq(L.FilterPasses(RED, false, BLU, 4, 0), false, "other")
-	T.eq(L.FilterPasses(RED, true, BLU, 4, 0), true, "negated other")
+	T.eq(L.FilterPasses(RED, false, RED, STATE.RND_RUNNING, UNASSIGNED), true, "match")
+	T.eq(L.FilterPasses(RED, false, BLU, STATE.RND_RUNNING, UNASSIGNED), false, "other")
+	T.eq(L.FilterPasses(RED, true, BLU, STATE.RND_RUNNING, UNASSIGNED), true, "negated other")
 end)
 
 T.test("winners pass every team filter during team win, negated or not", function()
-	T.eq(L.FilterPasses(RED, false, BLU, L.STATE_TEAM_WIN, BLU), true, "plain")
-	T.eq(L.FilterPasses(RED, true, BLU, L.STATE_TEAM_WIN, BLU), true, "negated")
-	T.eq(L.FilterPasses(BLU, true, BLU, L.STATE_TEAM_WIN, BLU), true, "own negated")
+	T.eq(L.FilterPasses(RED, false, BLU, STATE.TEAM_WIN, BLU), true, "plain")
+	T.eq(L.FilterPasses(RED, true, BLU, STATE.TEAM_WIN, BLU), true, "negated")
+	T.eq(L.FilterPasses(BLU, true, BLU, STATE.TEAM_WIN, BLU), true, "own negated")
 end)
 
 T.test("losers keep the normal filter during team win", function()
-	T.eq(L.FilterPasses(BLU, false, RED, L.STATE_TEAM_WIN, BLU), false)
+	T.eq(L.FilterPasses(BLU, false, RED, STATE.TEAM_WIN, BLU), false)
 end)
 
 -- CFuncRespawnRoomVisualizer::ShouldCollide / ShouldTransmit
@@ -150,12 +153,12 @@ end)
 T.test("a visualizer blocks only the enemies of its team", function()
 	T.eq(L.VisualizerBlocks(RED, BLU), true, "blu at red door")
 	T.eq(L.VisualizerBlocks(RED, RED), false, "red at red door")
-	T.eq(L.VisualizerBlocks(RED, 0), false, "unassigned")
-	T.eq(L.VisualizerBlocks(0, BLU), false, "no team")
+	T.eq(L.VisualizerBlocks(RED, UNASSIGNED), false, "unassigned")
+	T.eq(L.VisualizerBlocks(UNASSIGNED, BLU), false, "no team")
 end)
 
 T.test("a visualizer on a non-playing team blocks every player", function()
-	T.eq(L.VisualizerBlocks(5, RED), true)
+	T.eq(L.VisualizerBlocks(L.HALLOWEEN, RED), true)
 end)
 
 T.test("a visualizer shows to enemies while its room is active and nobody has won", function()
@@ -169,18 +172,18 @@ end)
 -- CRegenerateZone::Touch
 
 T.test("a resupply zone serves its own team", function()
-	T.eq(L.RegenerateAllowed(RED, RED, 4, 0), true, "own")
-	T.eq(L.RegenerateAllowed(RED, BLU, 4, 0), false, "enemy")
-	T.eq(L.RegenerateAllowed(0, BLU, 4, 0), true, "any team")
+	T.eq(L.RegenerateAllowed(RED, RED, STATE.RND_RUNNING, UNASSIGNED), true, "own")
+	T.eq(L.RegenerateAllowed(RED, BLU, STATE.RND_RUNNING, UNASSIGNED), false, "enemy")
+	T.eq(L.RegenerateAllowed(UNASSIGNED, BLU, STATE.RND_RUNNING, UNASSIGNED), true, "any team")
 end)
 
 T.test("during team win every zone serves the winners and none the losers", function()
-	T.eq(L.RegenerateAllowed(RED, BLU, L.STATE_TEAM_WIN, BLU), true, "winner at enemy locker")
-	T.eq(L.RegenerateAllowed(RED, RED, L.STATE_TEAM_WIN, BLU), false, "loser at own locker")
+	T.eq(L.RegenerateAllowed(RED, BLU, STATE.TEAM_WIN, BLU), true, "winner at enemy locker")
+	T.eq(L.RegenerateAllowed(RED, RED, STATE.TEAM_WIN, BLU), false, "loser at own locker")
 end)
 
 T.test("no resupply in stalemate", function()
-	T.eq(L.RegenerateAllowed(RED, RED, L.STATE_STALEMATE, 0), false)
+	T.eq(L.RegenerateAllowed(RED, RED, STATE.STALEMATE, UNASSIGNED), false)
 end)
 
 T.finish()

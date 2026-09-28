@@ -1,7 +1,8 @@
 local T = dofile("tests/harness.lua")
 local S = T.require("foundation.spectate")
+local Teams = T.require("foundation.teams")
 
-local RED, BLU, SPEC = 2, 3, 1
+local NOBODY, SPEC, RED, BLU = Teams.UNASSIGNED, Teams.SPECTATOR, Teams.RED, Teams.BLUE
 local TIMES = S.TIMES
 
 -- Death phases (CTFPlayer::StateThinkDYING) ------------------------------------
@@ -114,7 +115,7 @@ local function player(team, extra)
 	return p
 end
 local function point(extra)
-	local p = { id = {}, kind = "point", team = 0, enabled = true }
+	local p = { id = {}, kind = "point", team = NOBODY, enabled = true }
 	for k, v in pairs(extra or {}) do p[k] = v end
 	return p
 end
@@ -177,11 +178,11 @@ end)
 T.test("a point's own TeamNum limits it to that team under mp_forcecamera 1", function()
 	T.eq(S.IsValidTarget(redViewer, point({ team = BLU }), rules()), false)
 	T.eq(S.IsValidTarget(redViewer, point({ team = RED }), rules()), true)
-	T.eq(S.IsValidTarget(redViewer, point({ team = 0 }), rules()), true)
+	T.eq(S.IsValidTarget(redViewer, point({ team = NOBODY }), rules()), true)
 end)
 
 T.test("the payload cart is not watchable during a team win", function()
-	local cart = { id = {}, kind = "entity", team = 0, train = true }
+	local cart = { id = {}, kind = "entity", team = NOBODY, train = true }
 	T.eq(S.IsValidTarget(redViewer, cart, rules()), true)
 	T.eq(S.IsValidTarget(redViewer, cart, rules({ teamWin = true })), false)
 end)

@@ -3,60 +3,63 @@
 -- compute them.
 local T = dofile("tests/harness.lua")
 local R = T.require("foundation.rounds")
+local Teams = T.require("foundation.teams")
+
+local NOBODY, RED, BLU = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
 
 local function P(owner, group) return { owner = owner, group = group or 0 } end
 
 -- TeamOwnsAllPoints ---------------------------------------------------------
 
 T.test("one team owning every point of a group wins it", function()
-	T.eq(R.TeamOwnsAllPoints({ P(3), P(3) }), 3)
+	T.eq(R.TeamOwnsAllPoints({ P(BLU), P(BLU) }), BLU)
 end)
 
 T.test("mixed owners in the only group is nobody", function()
-	T.eq(R.TeamOwnsAllPoints({ P(3), P(2) }), 0)
+	T.eq(R.TeamOwnsAllPoints({ P(BLU), P(RED) }), NOBODY)
 end)
 
 T.test("neutral points are nobody", function()
-	T.eq(R.TeamOwnsAllPoints({ P(0), P(0) }), 0)
+	T.eq(R.TeamOwnsAllPoints({ P(NOBODY), P(NOBODY) }), NOBODY)
 end)
 
 -- plr_pipeline: blue_cap_A is alone in group 1, red_cap_A in group 0.
 T.test("a group owned outright wins even when another group is contested", function()
-	T.eq(R.TeamOwnsAllPoints({ P(0, 0), P(3, 1) }), 3)
+	T.eq(R.TeamOwnsAllPoints({ P(NOBODY, 0), P(BLU, 1) }), BLU)
 end)
 
 T.test("groups are reported in group order", function()
-	T.eq(R.TeamOwnsAllPoints({ P(3, 1), P(2, 0) }), 2)
+	T.eq(R.TeamOwnsAllPoints({ P(BLU, 1), P(RED, 0) }), RED)
 end)
 
 T.test("an empty point list is nobody", function()
-	T.eq(R.TeamOwnsAllPoints({}), 0)
+	T.eq(R.TeamOwnsAllPoints({}), NOBODY)
 end)
 
 -- RoundWinner / RoundPlayable ------------------------------------------------
 
 T.test("the restricted team cannot win by capping", function()
-	T.eq(R.RoundWinner(2, { P(2), P(2) }), nil)
+	T.eq(R.RoundWinner(RED, { P(RED), P(RED) }), nil)
 end)
 
 T.test("the other team wins by capping everything", function()
-	T.eq(R.RoundWinner(2, { P(3), P(3) }), 3)
+	T.eq(R.RoundWinner(RED, { P(BLU), P(BLU) }), BLU)
 end)
 
 T.test("restrict 1 means neither team wins by capping", function()
-	T.eq(R.RoundWinner(1, { P(3), P(3) }), nil)
+	T.eq(R.RoundWinner(R.RESTRICT_NEITHER, { P(BLU), P(BLU) }), nil)
 end)
 
 T.test("a round someone has already won is not playable", function()
-	T.eq(R.RoundPlayable(2, { P(3), P(3) }), false)
+	T.eq(R.RoundPlayable(RED, { P(BLU), P(BLU) }), false)
 end)
 
 T.test("a round owned by its restricted team is playable", function()
-	T.eq(R.RoundPlayable(2, { P(2), P(2) }), true)
+	T.eq(R.RoundPlayable(RED, { P(RED), P(RED) }), true)
 end)
 
 T.test("restrict 1 rounds are always playable", function()
-	T.eq(R.RoundPlayable(1, { P(3), P(3) }), true)
+	T.eq(R.RoundPlayable(R.RESTRICT_NEITHER, { P(BLU), P(BLU) }), true)
 end)
 
 -- ChooseRound (GetControlPointRoundToPlay) ---------------------------------------
@@ -137,44 +140,44 @@ end)
 -- RoundsRemaining (CalcNumRoundsRemaining) ----------------------------------------
 
 T.test("rounds remaining for BLU on pl_goldrush before any stage", function()
-	local points = { P(2), P(2), P(2), P(2), P(2), P(2), P(2) }
+	local points = { P(RED), P(RED), P(RED), P(RED), P(RED), P(RED), P(RED) }
 	local rounds = {
-		{ restrict = 2, points = { 1, 2 } },
-		{ restrict = 2, points = { 3, 4 } },
-		{ restrict = 2, points = { 5, 6, 7 } },
+		{ restrict = RED, points = { 1, 2 } },
+		{ restrict = RED, points = { 3, 4 } },
+		{ restrict = RED, points = { 5, 6, 7 } },
 	}
-	T.eq(R.RoundsRemaining(3, rounds, points), 3)
-	points[1].owner, points[2].owner = 3, 3
-	T.eq(R.RoundsRemaining(3, rounds, points), 2)
+	T.eq(R.RoundsRemaining(BLU, rounds, points), 3)
+	points[1].owner, points[2].owner = BLU, BLU
+	T.eq(R.RoundsRemaining(BLU, rounds, points), 2)
 end)
 
 T.test("rounds remaining stops when no round can make progress", function()
-	local points = { P(2), P(2) }
-	local rounds = { { restrict = 2, points = { 1 } } }
-	T.eq(R.RoundsRemaining(3, rounds, points), 1)
+	local points = { P(RED), P(RED) }
+	local rounds = { { restrict = RED, points = { 1 } } }
+	T.eq(R.RoundsRemaining(BLU, rounds, points), 1)
 end)
 
 -- StalemateOutcome (State_Think_STALEMATE) ------------------------------------------
 
 T.test("a team with nobody alive loses sudden death", function()
-	local winner, draw = R.StalemateOutcome({ [2] = { players = 3, alive = 0 }, [3] = { players = 2, alive = 1 } })
-	T.eq(winner, 3)
+	local winner, draw = R.StalemateOutcome({ [RED] = { players = 3, alive = 0 }, [BLU] = { players = 2, alive = 1 } })
+	T.eq(winner, BLU)
 	T.eq(draw, false)
 end)
 
 T.test("an empty team counts as dead", function()
-	local winner = R.StalemateOutcome({ [2] = { players = 1, alive = 1 }, [3] = { players = 0, alive = 0 } })
-	T.eq(winner, 2)
+	local winner = R.StalemateOutcome({ [RED] = { players = 1, alive = 1 }, [BLU] = { players = 0, alive = 0 } })
+	T.eq(winner, RED)
 end)
 
 T.test("both teams dead is a draw", function()
-	local winner, draw = R.StalemateOutcome({ [2] = { players = 1, alive = 0 }, [3] = { players = 1, alive = 0 } })
+	local winner, draw = R.StalemateOutcome({ [RED] = { players = 1, alive = 0 }, [BLU] = { players = 1, alive = 0 } })
 	T.eq(winner, nil)
 	T.eq(draw, true)
 end)
 
 T.test("both teams alive goes on", function()
-	local winner, draw = R.StalemateOutcome({ [2] = { players = 1, alive = 1 }, [3] = { players = 1, alive = 1 } })
+	local winner, draw = R.StalemateOutcome({ [RED] = { players = 1, alive = 1 }, [BLU] = { players = 1, alive = 1 } })
 	T.eq(winner, nil)
 	T.eq(draw, false)
 end)
@@ -187,9 +190,9 @@ T.test("time left counts down from the map reset", function()
 end)
 
 T.test("win limit is reached by the score", function()
-	T.eq(R.WinLimitReached(3, { [2] = 1, [3] = 3 }), true)
-	T.eq(R.WinLimitReached(3, { [2] = 1, [3] = 2 }), false)
-	T.eq(R.WinLimitReached(0, { [2] = 9, [3] = 9 }), false)
+	T.eq(R.WinLimitReached(3, { [RED] = 1, [BLU] = 3 }), true)
+	T.eq(R.WinLimitReached(3, { [RED] = 1, [BLU] = 2 }), false)
+	T.eq(R.WinLimitReached(0, { [RED] = 9, [BLU] = 9 }), false)
 end)
 
 T.test("max rounds counts full rounds played", function()
@@ -222,9 +225,9 @@ T.test("the time limit may change level unless unplayed mini-rounds must be play
 end)
 
 T.test("the timelimit winner is the team with more points, or nobody when tied", function()
-	T.eq(R.TimelimitWinner({ [2] = 2, [3] = 2 }), 0)
-	T.eq(R.TimelimitWinner({ [2] = 3, [3] = 2 }), 2)
-	T.eq(R.TimelimitWinner({ [2] = 1, [3] = 2 }), 3)
+	T.eq(R.TimelimitWinner({ [RED] = 2, [BLU] = 2 }), NOBODY)
+	T.eq(R.TimelimitWinner({ [RED] = 3, [BLU] = 2 }), RED)
+	T.eq(R.TimelimitWinner({ [RED] = 1, [BLU] = 2 }), BLU)
 end)
 
 T.test("a full round or an expired time limit rewards the winner", function()
@@ -245,22 +248,22 @@ T.test("point ranks are 0-based in index order", function()
 end)
 
 T.test("the base point is the team's end of the chain", function()
-	local points = { { index = 0, defaultOwner = 3 }, { index = 1, defaultOwner = 0 }, { index = 2, defaultOwner = 2 } }
-	T.eq(R.BaseControlPoint(3, points), 0)
-	T.eq(R.BaseControlPoint(2, points), 2)
-	T.eq(R.BaseControlPoint(0, { { index = 0, defaultOwner = 2 } }), -1)
+	local points = { { index = 0, defaultOwner = BLU }, { index = 1, defaultOwner = NOBODY }, { index = 2, defaultOwner = RED } }
+	T.eq(R.BaseControlPoint(BLU, points), 0)
+	T.eq(R.BaseControlPoint(RED, points), 2)
+	T.eq(R.BaseControlPoint(NOBODY, { { index = 0, defaultOwner = RED } }), R.NO_POINT)
 end)
 
 T.test("the farthest owned point walks from the base", function()
-	local owners = { [0] = 3, [1] = 3, [2] = 0, [3] = 2 }
-	T.eq(R.FarthestOwnedControlPoint(3, owners, 4, 0), 1)
-	T.eq(R.FarthestOwnedControlPoint(2, owners, 4, 3), 3)
-	T.eq(R.FarthestOwnedControlPoint(2, owners, 4, -1), -1)
+	local owners = { [0] = BLU, [1] = BLU, [2] = NOBODY, [3] = RED }
+	T.eq(R.FarthestOwnedControlPoint(BLU, owners, 4, 0), 1)
+	T.eq(R.FarthestOwnedControlPoint(RED, owners, 4, 3), 3)
+	T.eq(R.FarthestOwnedControlPoint(RED, owners, 4, R.NO_POINT), R.NO_POINT)
 end)
 
 local function Q(over)
-	local q = { caplinear = true, index = 1, team = 3, locked = false, previous = { -1, -1, -1 },
-		playingMiniRounds = false, owners = { [0] = 3, [1] = 0, [2] = 2 }, count = 3, base = 0 }
+	local q = { caplinear = true, index = 1, team = BLU, locked = false, previous = { R.NO_POINT, R.NO_POINT, R.NO_POINT },
+		playingMiniRounds = false, owners = { [0] = BLU, [1] = NOBODY, [2] = RED }, count = 3, base = 0 }
 	for k, v in pairs(over or {}) do q[k] = v end
 	return q
 end
@@ -275,12 +278,12 @@ T.test("a locked point may not be capped", function()
 end)
 
 T.test("a point that requires itself is always cappable, locked or not", function()
-	T.eq(R.TeamMayCapturePoint(Q({ locked = true, previous = { 1, -1, -1 } })), true)
+	T.eq(R.TeamMayCapturePoint(Q({ locked = true, previous = { 1, R.NO_POINT, R.NO_POINT } })), true)
 end)
 
 T.test("named previous points must all be owned", function()
-	T.eq(R.TeamMayCapturePoint(Q({ index = 2, previous = { 0, -1, -1 } })), true)
-	T.eq(R.TeamMayCapturePoint(Q({ index = 2, previous = { 0, 1, -1 } })), false)
+	T.eq(R.TeamMayCapturePoint(Q({ index = 2, previous = { 0, R.NO_POINT, R.NO_POINT } })), true)
+	T.eq(R.TeamMayCapturePoint(Q({ index = 2, previous = { 0, 1, R.NO_POINT } })), false)
 end)
 
 T.test("with mini-rounds and no previous points any point is cappable", function()

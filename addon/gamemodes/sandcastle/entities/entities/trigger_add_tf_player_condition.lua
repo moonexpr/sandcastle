@@ -5,15 +5,16 @@
 ENT.Type = "brush"
 ENT.Base = "wetsand_trigger_volume"
 
-local PERMANENT = -1
+local PERMANENT = WETSAND.PlayerRules.PERMANENT
+local INVALID = WETSAND.PlayerRules.COND.INVALID
 
 function ENT:TriggerInit()
-	self.condition = tonumber(self:Key("condition", -1)) or -1
+	self.condition = tonumber(self:Key("condition", INVALID)) or INVALID
 	self.duration = tonumber(self:Key("duration", 0)) or 0
 end
 
 function ENT:PlayerStartTouch(ply)
-	if not self:PassesTriggerFilters(ply) or self.condition < 0 then return end
+	if not self:PassesTriggerFilters(ply) or self.condition == INVALID then return end
 	WETSAND.AddCondition(ply, self.condition, self.duration)
 	self:TriggerOutput("OnStartTouch", ply)
 end
@@ -21,6 +22,6 @@ end
 function ENT:PlayerEndTouch(ply)
 	self:TriggerOutput("OnEndTouch", ply)
 	if self.duration ~= PERMANENT or not self.enabled then return end
-	if not self:PassesTriggerFilters(ply) or self.condition < 0 then return end
+	if not self:PassesTriggerFilters(ply) or self.condition == INVALID then return end
 	WETSAND.RemoveCondition(ply, self.condition)
 end

@@ -79,7 +79,7 @@ end
 
 local function DrawWinPanel(w, h)
 	local panel = L.WinPanel({
-		winner = GetGlobal2Int("tf2.winner", 0),
+		winner = GetGlobal2Int("tf2.winner", WETSAND.TEAM_UNASSIGNED),
 		reason = GetGlobal2Int("tf2.round.winreason", 0),
 		fullRound = GetGlobal2Bool("tf2.round.fullround", true),
 		remaining = GetGlobal2Int("tf2.round.remaining", 0),
@@ -87,7 +87,7 @@ local function DrawWinPanel(w, h)
 	local rows = {}
 	if panel.reason then rows[#rows + 1] = panel.reason end
 	if panel.details then rows[#rows + 1] = panel.details end
-	DrawCentrePanel(w, h, panel.title, WETSAND.TeamColor[GetGlobal2Int("tf2.winner", 0)] or color_white, rows)
+	DrawCentrePanel(w, h, panel.title, WETSAND.TeamColor[GetGlobal2Int("tf2.winner", WETSAND.TEAM_UNASSIGNED)] or color_white, rows)
 end
 
 local stalemateSince

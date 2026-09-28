@@ -3,7 +3,10 @@
 local T = dofile("tests/harness.lua")
 local C = T.require("foundation.capture")
 
-local RED, BLU = 2, 3
+local Teams = T.require("foundation.teams")
+
+local NOBODY, RED, BLU = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
+local LABEL = { [NOBODY] = "nobody", [RED] = "red", [BLU] = "blu" }
 
 -- A 10s point both teams may cap, one player each needed, TF2's defaults.
 local function Input(now, red, blu, over)
@@ -16,7 +19,7 @@ local function Input(now, red, blu, over)
 		startRequired = { [RED] = 1, [BLU] = 1 },
 		capTime = 10,
 		scales = true,
-		blockstyle = 1,
+		blockstyle = C.BLOCKSTYLE_PAUSE,
 		deteriorate = 90,
 		overtime = false,
 		teamMayCapture = function() return true end,
@@ -29,7 +32,7 @@ local function Kinds(events)
 	local out = {}
 	for _, e in ipairs(events) do
 		local s = e.kind
-		if e.team then s = s .. ":" .. e.team end
+		if e.team then s = s .. ":" .. LABEL[e.team] end
 		if e.kind == "numcappers" then s = s .. ":" .. e.n .. (e.blocked and "b" or "") end
 		if e.kind == "blocked" then s = s .. ":" .. tostring(e.value) end
 		out[#out + 1] = s
@@ -43,13 +46,13 @@ T.test("total time scales with required cappers under mp_capstyle 1", function()
 end)
 
 T.test("nothing happens on an empty point", function()
-	local s = C.New(0)
+	local s = C.New(NOBODY)
 	T.eq(Kinds(C.Step(s, Input(0, 0, 0))), "")
 end)
 
 T.test("a capture starts when a team that may cap stands on the point", function()
 	local s = C.New(RED)
-	T.eq(Kinds(C.Step(s, Input(0, 0, 1))), "start:3,numcappers:1,capturestart:3")
+	T.eq(Kinds(C.Step(s, Input(0, 0, 1))), "start:blu,numcappers:1,capturestart:blu")
 	T.eq(s.capturing, true)
 	T.eq(s.cappingTeam, BLU)
 	T.eq(s.timeRemaining, 20)
@@ -72,14 +75,14 @@ T.test("team_startcap: too few players do not start a capture", function()
 	local i = Input(0, 0, 1)
 	i.startRequired[BLU] = 2
 	T.eq(Kinds(C.Step(s, i)), "")
-	T.eq(Kinds(C.Step(s, Input(0.1, 0, 2, { startRequired = { [RED] = 1, [BLU] = 2 } }))), "start:3,numcappers:2,capturestart:3")
+	T.eq(Kinds(C.Step(s, Input(0.1, 0, 2, { startRequired = { [RED] = 1, [BLU] = 2 } }))), "start:blu,numcappers:2,capturestart:blu")
 end)
 
 T.test("mp_capstyle 0: team_numcap players are needed to start", function()
 	local s = C.New(RED)
 	local over = { scales = false, numRequired = { [RED] = 1, [BLU] = 2 } }
 	T.eq(Kinds(C.Step(s, Input(0, 0, 1, over))), "")
-	T.eq(Kinds(C.Step(s, Input(0.1, 0, 2, over))), "start:3,numcappers:2,capturestart:3")
+	T.eq(Kinds(C.Step(s, Input(0.1, 0, 2, over))), "start:blu,numcappers:2,capturestart:blu")
 end)
 
 T.test("one capper takes the whole scaled time, then the point is captured", function()
@@ -87,7 +90,7 @@ T.test("one capper takes the whole scaled time, then the point is captured", fun
 	C.Step(s, Input(0, 0, 1))
 	for t = 1, 19 do C.Step(s, Input(t, 0, 1)) end
 	T.near(s.timeRemaining, 1)
-	T.eq(Kinds(C.Step(s, Input(20, 0, 1))), "end:3,owner:3,numcappers:0")
+	T.eq(Kinds(C.Step(s, Input(20, 0, 1))), "end:blu,owner:blu,numcappers:0")
 	T.eq(s.owner, BLU)
 	T.eq(s.capturing, false)
 end)
@@ -119,8 +122,8 @@ end)
 
 T.test("a block names the team whose capture it stops", function()
 	local s = C.New(RED)
-	C.Step(s, Input(0, 0, 1, { blockstyle = 0 }))
-	local events = C.Step(s, Input(1, 1, 1, { blockstyle = 0 }))
+	C.Step(s, Input(0, 0, 1, { blockstyle = C.BLOCKSTYLE_BREAK }))
+	local events = C.Step(s, Input(1, 1, 1, { blockstyle = C.BLOCKSTYLE_BREAK }))
 	T.eq(events[2].kind, "blocked")
 	T.eq(events[2].capping, BLU)
 end)
@@ -142,8 +145,8 @@ end)
 
 T.test("mp_blockstyle 0: a block breaks the capture", function()
 	local s = C.New(RED)
-	C.Step(s, Input(0, 0, 1, { blockstyle = 0 }))
-	T.eq(Kinds(C.Step(s, Input(1, 1, 1, { blockstyle = 0 }))), "numcappers:1,blocked:true,break:3,numcappers:0")
+	C.Step(s, Input(0, 0, 1, { blockstyle = C.BLOCKSTYLE_BREAK }))
+	T.eq(Kinds(C.Step(s, Input(1, 1, 1, { blockstyle = C.BLOCKSTYLE_BREAK }))), "numcappers:1,blocked:true,break:blu,numcappers:0")
 	T.eq(s.capturing, false)
 end)
 
@@ -176,7 +179,7 @@ end)
 T.test("a fully deteriorated capture breaks", function()
 	local s = C.New(RED)
 	C.Step(s, Input(0, 0, 1))
-	T.eq(Kinds(C.Step(s, Input(0.5, 0, 0))), "numcappers:0,break:3,numcappers:0")
+	T.eq(Kinds(C.Step(s, Input(0.5, 0, 0))), "numcappers:0,break:blu,numcappers:0")
 end)
 
 T.test("a payload area (99999s) breaks within a think of its pushers leaving", function()
@@ -184,24 +187,24 @@ T.test("a payload area (99999s) breaks within a think of its pushers leaving", f
 	C.Step(s, Input(0, 0, 1, { capTime = 99999 }))
 	C.Step(s, Input(30, 0, 1, { capTime = 99999 }))
 	local events = C.Step(s, Input(30.1, 0, 0, { capTime = 99999 }))
-	T.eq(Kinds(events), "numcappers:0,break:3,numcappers:0")
+	T.eq(Kinds(events), "numcappers:0,break:blu,numcappers:0")
 end)
 
 T.test("a capture the team may no longer make resets at once", function()
 	local s = C.New(RED)
 	C.Step(s, Input(0, 0, 1))
 	local i = Input(1, 0, 0, { teamMayCapture = function() return false end })
-	T.eq(Kinds(C.Step(s, i)), "numcappers:0,break:3,numcappers:0")
+	T.eq(Kinds(C.Step(s, i)), "numcappers:0,break:blu,numcappers:0")
 end)
 
 T.test("on a neutral point the other team reverses the capture", function()
-	local s = C.New(0)
+	local s = C.New(NOBODY)
 	C.Step(s, Input(0, 0, 1))
 	C.Step(s, Input(5, 0, 1))
 	T.near(s.timeRemaining, 15)
 	C.Step(s, Input(5.1, 0, 0))
 	-- RED alone on a point BLU is capping
-	local s2 = C.New(0)
+	local s2 = C.New(NOBODY)
 	C.Step(s2, Input(0, 0, 1))
 	C.Step(s2, Input(5, 0, 1))
 	C.Step(s2, Input(6, 1, 0))
@@ -211,7 +214,7 @@ end)
 T.test("when points may not be captured, a running capture breaks", function()
 	local s = C.New(RED)
 	C.Step(s, Input(0, 0, 1))
-	T.eq(Kinds(C.Step(s, Input(1, 0, 1, { pointsMayBeCaptured = false }))), "break:3,numcappers:0")
+	T.eq(Kinds(C.Step(s, Input(1, 0, 1, { pointsMayBeCaptured = false }))), "break:blu,numcappers:0")
 	T.eq(Kinds(C.Step(s, Input(2, 0, 1, { pointsMayBeCaptured = false }))), "")
 end)
 
@@ -219,14 +222,14 @@ T.test("CaptureCurrentCP ends a running capture and does nothing otherwise", fun
 	local s = C.New(RED)
 	T.eq(Kinds(C.CaptureCurrent(s)), "")
 	C.Step(s, Input(0, 0, 1))
-	T.eq(Kinds(C.CaptureCurrent(s)), "end:3,owner:3,numcappers:0")
+	T.eq(Kinds(C.CaptureCurrent(s)), "end:blu,owner:blu,numcappers:0")
 	T.eq(s.owner, BLU)
 end)
 
 T.test("SetControlPoint breaks the capture", function()
 	local s = C.New(RED)
 	C.Step(s, Input(0, 0, 1))
-	T.eq(Kinds(C.Break(s)), "break:3,numcappers:0")
+	T.eq(Kinds(C.Break(s)), "break:blu,numcappers:0")
 	T.eq(Kinds(C.Break(s)), "")
 end)
 
@@ -246,7 +249,7 @@ T.test("respawn adjustments move from the old owner to the new one", function()
 	T.eq(adjust[1].seconds, -4)
 	T.eq(adjust[2].team, BLU)
 	T.eq(adjust[2].seconds, -2)
-	T.eq(#C.SpawnAdjustments(0, BLU, { [RED] = 0, [BLU] = 0 }), 0)
+	T.eq(#C.SpawnAdjustments(NOBODY, BLU, { [RED] = 0, [BLU] = 0 }), 0)
 end)
 
 T.finish()

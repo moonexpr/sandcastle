@@ -62,7 +62,7 @@ local function Describe(ent)
 	elseif kind == "point" then
 		return { id = ent, kind = kind, team = ent:TeamNum(), enabled = ent:IsEnabled(), associatedTeam = AssociatedTeam(ent), welcome = ent:IsDefaultWelcome() }
 	end
-	return { id = ent, kind = kind, team = 0, train = ent:GetClass() == "func_tracktrain" }
+	return { id = ent, kind = kind, team = WETSAND.TEAM_UNASSIGNED, train = ent:GetClass() == "func_tracktrain" }
 end
 
 local function Validator(ply)

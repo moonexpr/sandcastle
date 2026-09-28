@@ -5,6 +5,7 @@
 -- TeamMayCapturePoint), the timer's outputs (teamplay_round_timer.cpp) and the
 -- win panel (tf_hud_winpanel.cpp). No GMod globals; randomness is passed in.
 local ipairs, math, pairs, string, table = ipairs, math, pairs, string, table
+local Teams = require("foundation.teams")
 module(...)
 
 -- teamplayroundbased_gamerules.h
@@ -16,8 +17,14 @@ STALEMATE = { JOIN_MID = 0, TIMER = 1, SERVER_TIMELIMIT = 2 }
 -- shareddefs.h: point_warn_on_cap
 CP_WARN = { NORMAL = 0, FINALCAP = 1, NO_ANNOUNCEMENTS = 2 }
 
-local FIRST_GAME_TEAM = 2
-local TEAM_INVALID = -1
+local UNASSIGNED, RED, BLUE = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
+local FIRST_GAME_TEAM, TEAM_INVALID = Teams.FIRST_GAME_TEAM, Teams.INVALID
+local GAME_TEAMS = { RED, BLUE }
+-- restrict_team_cap_win's "Neither" (team_control_point_round.cpp): TEAM_SPECTATOR,
+-- which no playing team is, so every team may win the round.
+RESTRICT_NEITHER = Teams.SPECTATOR
+-- A control point index or rank that names no point (the SDK's -1).
+NO_POINT = -1
 
 -- Control points and rounds ---------------------------------------------------------
 
@@ -29,8 +36,8 @@ function TeamOwnsAllPoints(points)
 		local g = byGroup[p.group]
 		if g == nil then
 			byGroup[p.group] = p.owner
-		elseif g ~= 0 and p.owner ~= g then
-			byGroup[p.group] = 0
+		elseif g ~= UNASSIGNED and p.owner ~= g then
+			byGroup[p.group] = UNASSIGNED
 		end
 	end
 	local groups = {}
@@ -39,20 +46,20 @@ function TeamOwnsAllPoints(points)
 	for _, group in ipairs(groups) do
 		if byGroup[group] >= FIRST_GAME_TEAM then return byGroup[group] end
 	end
-	return 0
+	return UNASSIGNED
 end
 
 -- CTeamControlPointRound::CheckWinConditions (and the master's own check when
--- the map has no rounds): the winner, or nil. restrict 1 means nobody.
+-- the map has no rounds): the winner, or nil.
 function RoundWinner(restrict, points)
 	local winner = TeamOwnsAllPoints(points)
-	if restrict ~= 1 and winner >= FIRST_GAME_TEAM and winner ~= restrict then return winner end
+	if restrict ~= RESTRICT_NEITHER and winner >= FIRST_GAME_TEAM and winner ~= restrict then return winner end
 	return nil
 end
 
 -- CTeamControlPointRound::IsPlayable
 function RoundPlayable(restrict, points)
-	if restrict == 1 then return true end
+	if restrict == RESTRICT_NEITHER then return true end
 	return RoundWinner(restrict, points) == nil
 end
 
@@ -146,7 +153,7 @@ function RoundsRemaining(team, rounds, points)
 				local owner = owned[i] and team or points[i].owner
 				if k == 1 then roundOwner = owner elseif roundOwner ~= owner then roundOwner = TEAM_INVALID end
 			end
-			local playable = roundOwner == nil or roundOwner < FIRST_GAME_TEAM or r.restrict == 1 or roundOwner == r.restrict
+			local playable = roundOwner == nil or roundOwner < FIRST_GAME_TEAM or r.restrict == RESTRICT_NEITHER or roundOwner == r.restrict
 			if playable then
 				for _, i in ipairs(r.points) do
 					if not owned[i] then owned[i] = true count = count + 1 progressed = true end
@@ -167,7 +174,7 @@ end
 -- one side is dead, and whether everyone is dead.
 function StalemateOutcome(teams)
 	local dead, alive
-	for t = 2, 3 do
+	for _, t in ipairs(GAME_TEAMS) do
 		if teams[t].players > 0 and teams[t].alive > 0 then alive = t else dead = t end
 	end
 	if dead and alive then return alive, false end
@@ -182,7 +189,7 @@ end
 -- CheckWinLimit
 function WinLimitReached(winlimit, scores)
 	if winlimit <= 0 then return false end
-	return scores[2] >= winlimit or scores[3] >= winlimit
+	return scores[RED] >= winlimit or scores[BLUE] >= winlimit
 end
 
 -- CheckMaxRounds
@@ -205,10 +212,10 @@ function TimeLimitReached(c)
 	return c.timeLeft <= 0 or c.afterStalemate == true or switchDueToTime
 end
 
--- State_Think_RND_RUNNING at the time limit: the higher score, 0 when drawn.
+-- State_Think_RND_RUNNING at the time limit: the higher score, nobody when drawn.
 function TimelimitWinner(scores)
-	if scores[2] == scores[3] then return 0 end
-	return scores[3] > scores[2] and 3 or 2
+	if scores[RED] == scores[BLUE] then return UNASSIGNED end
+	return scores[BLUE] > scores[RED] and BLUE or RED
 end
 
 -- SetWinningTeam: a round win scores for a full round, or at the time limit.
@@ -240,16 +247,16 @@ function BaseControlPoint(team, points)
 		if not low or p.index < low.index then low = p end
 		if not high or p.index > high.index then high = p end
 	end
-	if not low then return -1 end
+	if not low then return NO_POINT end
 	if high.defaultOwner == team then return high.index end
 	if low.defaultOwner == team then return low.index end
-	return -1
+	return NO_POINT
 end
 
 -- CTFGameRules::GetFarthestOwnedControlPoint (without spawn points).
 -- owners is indexed by rank 0..count-1.
 function FarthestOwnedControlPoint(team, owners, count, base)
-	if base == -1 then return -1 end
+	if base == NO_POINT then return NO_POINT end
 	local walk, enemyEnd = 1, count - 1
 	if base ~= 0 then walk, enemyEnd = -1, 0 end
 	local farthest = base
@@ -262,20 +269,20 @@ function FarthestOwnedControlPoint(team, owners, count, base)
 	return farthest
 end
 
--- q = { caplinear, index, team, locked, previous = { three ranks, -1 unused },
+-- q = { caplinear, index, team, locked, previous = { three ranks, NO_POINT unused },
 -- playingMiniRounds, owners (by rank), count, base (the team's base rank) }
 function TeamMayCapturePoint(q)
 	if not q.caplinear then return true end
 	local needed = q.previous[1]
 	if needed == q.index then return true end
 	if q.locked then return false end
-	if needed == -1 then
+	if needed == NO_POINT then
 		if q.playingMiniRounds then return true end
 		local farthest = FarthestOwnedControlPoint(q.team, q.owners, q.count, q.base)
 		return math.abs(farthest - q.index) <= 1
 	end
 	for _, prev in ipairs(q.previous) do
-		if prev ~= -1 and q.owners[prev] ~= q.team then return false end
+		if prev ~= NO_POINT and q.owners[prev] ~= q.team then return false end
 	end
 	return true
 end
@@ -361,7 +368,7 @@ end
 
 -- Win panel (CTFWinPanel::FireGameEvent, English strings from tf_english.txt) -----------
 
-local TEAM_LABEL = { [2] = "RED", [3] = "BLU" }
+local TEAM_LABEL = { [RED] = "RED", [BLUE] = "BLU" }
 local REASON_TEXT = {
 	[WINREASON.ALL_POINTS_CAPTURED] = "%s captured all control points",
 	[WINREASON.OPPONENTS_DEAD] = "%s killed all opponents during sudden death",
@@ -408,6 +415,10 @@ end
 
 -- Localization ---------------------------------------------------------------------------
 
+local TAB, NEWLINE, SPACE, QUOTE = 9, 10, 32, 34
+local BOM = 0xFEFF
+local HIGH_SURROGATE, LOW_SURROGATE = 0xD800, 0xDC00
+
 local function Utf16(s)
 	return (string.gsub(s, ".", function(c) return c .. "\0" end))
 end
@@ -433,8 +444,8 @@ local function StartsLine(raw, i)
 	i = i - 2
 	while i >= 1 do
 		local u = Unit(raw, i)
-		if u == 10 or u == 0xFEFF then return true end
-		if u ~= 9 and u ~= 32 then return false end
+		if u == NEWLINE or u == BOM then return true end
+		if u ~= TAB and u ~= SPACE then return false end
 		i = i - 2
 	end
 	return true
@@ -456,16 +467,16 @@ function Localize(raw, token)
 		if s % 2 == 1 and StartsLine(raw, s) then i = e + 1 end
 		init = e + 1
 	until i
-	while i < #raw and (Unit(raw, i) == 9 or Unit(raw, i) == 32) do i = i + 2 end
-	if Unit(raw, i) ~= 34 then return nil end
+	while i < #raw and (Unit(raw, i) == TAB or Unit(raw, i) == SPACE) do i = i + 2 end
+	if Unit(raw, i) ~= QUOTE then return nil end
 	i = i + 2
 	local out = {}
 	while i < #raw do
 		local u = Unit(raw, i)
-		if u == 34 then return table.concat(out) end
-		if u >= 0xD800 and u < 0xDC00 then
+		if u == QUOTE then return table.concat(out) end
+		if u >= HIGH_SURROGATE and u < LOW_SURROGATE then
 			local low = Unit(raw, i + 2)
-			out[#out + 1] = Utf8(0x10000 + (u - 0xD800) * 0x400 + (low - 0xDC00))
+			out[#out + 1] = Utf8(0x10000 + (u - HIGH_SURROGATE) * 0x400 + (low - LOW_SURROGATE))
 			i = i + 4
 		else
 			out[#out + 1] = Utf8(u)

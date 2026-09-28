@@ -1,14 +1,18 @@
--- Team rules of TF2 as pure functions: joining, auto-assignment, balance,
--- and the team tests of the spawn-room entities. No GMod globals; the
--- modules that use it include it.
+-- TF2's team numbers, and its team rules as pure functions: joining,
+-- auto-assignment, balance, and the team tests of the spawn-room entities.
 local ipairs, math, pairs, string, table = ipairs, math, pairs, string, table
+local STATE = require("foundation.rounds.state")
 module(...)
 
-local UNASSIGNED, SPECTATOR, RED, BLUE = 0, 1, 2, 3
+-- The team numbers of shareddefs.h, which map keyvalues (TeamNum) use too.
+INVALID = -1 -- TEAM_INVALID
+UNASSIGNED = 0 -- TEAM_UNASSIGNED
+SPECTATOR = 1 -- TEAM_SPECTATOR
+RED = 2 -- TF_TEAM_RED
+BLUE = 3 -- TF_TEAM_BLUE
+HALLOWEEN = 5 -- TF_TEAM_HALLOWEEN: the Halloween bosses and skeletons
+FIRST_GAME_TEAM = RED -- FIRST_GAME_TEAM: RED and BLU are the teams that play
 AUTO = "auto"
-STATE_TEAM_WIN = 5 -- GR_STATE_TEAM_WIN
-STATE_STALEMATE = 7 -- GR_STATE_STALEMATE
-STATE_GAME_OVER = 8 -- GR_STATE_GAME_OVER
 
 -- HandleCommand_JoinTeam: g_aTeamNames, compared case-insensitively. A name
 -- it does not know leaves the command's initial choice, RED. "blu" is
@@ -108,7 +112,7 @@ end
 -- answers "no" to a negated filter, which the negation turns into a pass).
 function FilterPasses(filterTeam, negated, entTeam, state, winner)
 	local impl
-	if state == STATE_TEAM_WIN and entTeam == winner then
+	if state == STATE.TEAM_WIN and entTeam == winner then
 		impl = not negated
 	else
 		impl = entTeam == filterTeam
@@ -131,19 +135,19 @@ end
 -- other playing team while its room is active and nobody has won.
 function VisualizerVisible(vizTeam, roomActive, teamWin, viewerTeam)
 	if not roomActive or teamWin or vizTeam == UNASSIGNED then return false end
-	return viewerTeam > SPECTATOR and viewerTeam ~= vizTeam
+	return viewerTeam >= FIRST_GAME_TEAM and viewerTeam ~= vizTeam
 end
 
 -- CRegenerateZone::Touch: a zone with a team serves only that team; during
 -- team win every zone serves the winners and none the losers; nothing
 -- during a stalemate.
 function RegenerateAllowed(zoneTeam, playerTeam, state, winner)
-	if state == STATE_TEAM_WIN then
+	if state == STATE.TEAM_WIN then
 		if winner ~= playerTeam then return false end
 	elseif zoneTeam ~= UNASSIGNED and playerTeam ~= zoneTeam then
 		return false
 	end
-	return state ~= STATE_STALEMATE
+	return state ~= STATE.STALEMATE
 end
 
 -- The team menu (CTFTeamMenu) --------------------------------------------------
@@ -151,8 +155,8 @@ end
 -- CTFTeamMenu::ShowPanel: nobody changes teams once the game is over, nor
 -- does a player of a losing team while the winners celebrate.
 function TeamMenuAllowed(state, currentTeam, winner)
-	if state == STATE_GAME_OVER then return false end
-	return not (state == STATE_TEAM_WIN and currentTeam >= RED and currentTeam ~= winner)
+	if state == STATE.GAME_OVER then return false end
+	return not (state == STATE.TEAM_WIN and currentTeam >= FIRST_GAME_TEAM and currentTeam ~= winner)
 end
 
 local TEAM_FULL = "Team is full"

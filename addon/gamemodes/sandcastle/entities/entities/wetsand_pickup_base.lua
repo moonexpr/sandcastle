@@ -26,7 +26,7 @@ local SOUNDS = {
 function ENT:KeyValue(key, value)
 	local k = string.lower(key)
 	if k == "teamnum" then
-		self.team = tonumber(value) or 0
+		self.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED
 	elseif k == "startdisabled" then
 		self.startDisabled = value == "1"
 	elseif k == "automaterialize" then
@@ -54,7 +54,7 @@ function ENT:Initialize()
 	self:SetTrigger(true)
 	self:AddSolidFlags(FSOLID_NOT_SOLID)
 	self:ResetSequence(self:LookupSequence("idle"))
-	self.team = self.team or 0
+	self.team = self.team or WETSAND.TEAM_UNASSIGNED
 	if self.autoMaterialize == nil then self.autoMaterialize = true end
 	self.respawning = false
 	self:SetDisabled(self.startDisabled == true)
@@ -93,7 +93,7 @@ end
 -- CTFPowerup::ValidTouch
 function ENT:ValidTouch(ply)
 	if self.disabled or self.respawning or not WETSAND.IsAliveInGame(ply) then return false end
-	return self.team == 0 or ply:Team() == self.team
+	return self.team == WETSAND.TEAM_UNASSIGNED or ply:Team() == self.team
 end
 
 -- CHealthKit::MyTouch / CAmmoPack::MyTouch: whether the pickup was used.
@@ -121,7 +121,7 @@ local INPUTS = {
 	enable = function(self) self:SetDisabled(false) end,
 	disable = function(self) self:SetDisabled(true) end,
 	toggle = function(self) self:SetDisabled(not self.disabled) end,
-	setteam = function(self, value) self.team = tonumber(value) or 0 end,
+	setteam = function(self, value) self.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED end,
 }
 
 function ENT:AcceptInput(name, activator, caller, value)

@@ -1,5 +1,6 @@
 -- Shared definitions for the TF2 map entities. Team numbers and round states
--- keep TF2's values so map keyvalues (TeamNum=2/3) mean the same thing here.
+-- keep TF2's values (foundation.teams, foundation.rounds.state) so map keyvalues
+-- (TeamNum) mean the same thing here.
 WETSAND = WETSAND or {}
 
 -- Lua 5.1's require for the gamemode's module(...) files (gamemode/foundation/):
@@ -19,36 +20,30 @@ function WETSAND.require(name)
 end
 CHUNK_ENV.require = WETSAND.require
 
-WETSAND.TEAM_UNASSIGNED = 0
-WETSAND.TEAM_SPECTATOR = 1
-WETSAND.TEAM_RED = 2
-WETSAND.TEAM_BLUE = 3
-
--- gamerules_roundstate_t, teamplayroundbased_gamerules.h
-WETSAND.STATE = {
-	INIT = 0,
-	PREGAME = 1,
-	STARTGAME = 2,
-	PREROUND = 3,
-	RND_RUNNING = 4,
-	TEAM_WIN = 5,
-	RESTART = 6,
-	STALEMATE = 7,
-	GAME_OVER = 8,
-	BONUS = 9,
-	BETWEEN_RNDS = 10,
-}
-
 -- Pure rule libraries (gamemode/foundation/), shared so client prediction and
 -- drawing follow the same rules as the server.
 WETSAND.TeamRules = WETSAND.require("foundation.teams")
 WETSAND.PlayerRules = WETSAND.require("foundation.players")
 
-WETSAND.TeamName = { [0] = "Nobody", [1] = "Spectator", [2] = "RED", [3] = "BLU" }
+-- TF2's team numbers and round states, as the rule libraries define them.
+local Teams = WETSAND.TeamRules
+WETSAND.TEAM_UNASSIGNED = Teams.UNASSIGNED
+WETSAND.TEAM_SPECTATOR = Teams.SPECTATOR
+WETSAND.TEAM_RED = Teams.RED
+WETSAND.TEAM_BLUE = Teams.BLUE
+WETSAND.TEAM_HALLOWEEN = Teams.HALLOWEEN
+WETSAND.STATE = WETSAND.require("foundation.rounds.state")
+
+WETSAND.TeamName = {
+	[Teams.UNASSIGNED] = "Nobody",
+	[Teams.SPECTATOR] = "Spectator",
+	[Teams.RED] = "RED",
+	[Teams.BLUE] = "BLU",
+}
 WETSAND.TeamColor = {
-	[0] = Color(220, 220, 220),
-	[2] = Color(189, 59, 59),
-	[3] = Color(91, 122, 140),
+	[Teams.UNASSIGNED] = Color(220, 220, 220),
+	[Teams.RED] = Color(189, 59, 59),
+	[Teams.BLUE] = Color(91, 122, 140),
 }
 
 local PLAYABLE = { [WETSAND.TEAM_RED] = true, [WETSAND.TEAM_BLUE] = true }
@@ -96,8 +91,8 @@ function WETSAND.RestrictCommand(ply, cmd)
 		cmd:RemoveKey(IN_JUMP)
 		cmd:RemoveKey(IN_DUCK)
 	elseif state == WETSAND.STATE.TEAM_WIN then
-		local winner = GetGlobal2Int("tf2.winner", 0)
-		if winner ~= 0 and WETSAND.TeamOf(ply) ~= winner then
+		local winner = GetGlobal2Int("tf2.winner", WETSAND.TEAM_UNASSIGNED)
+		if winner ~= WETSAND.TEAM_UNASSIGNED and WETSAND.TeamOf(ply) ~= winner then
 			cmd:RemoveKey(IN_ATTACK)
 			cmd:RemoveKey(IN_ATTACK2)
 		end

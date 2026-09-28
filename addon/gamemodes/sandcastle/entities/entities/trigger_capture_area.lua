@@ -116,7 +116,7 @@ end
 
 -- Events --------------------------------------------------------------------------------
 
-local TEAM_OUTPUT = { [2] = "Team1", [3] = "Team2" }
+local TEAM_OUTPUT = { [WETSAND.TEAM_RED] = "Team1", [WETSAND.TEAM_BLUE] = "Team2" }
 
 -- SetNumCappers
 function ENT:SetNumCappers(n, blocked)

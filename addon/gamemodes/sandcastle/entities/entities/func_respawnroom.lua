@@ -55,5 +55,5 @@ ENT.Inputs = {
 	setinactive = function(self) self:SetActive(false) end,
 	toggleactive = function(self) self:SetActive(not self.active) end,
 	roundactivate = function(self) self:RoundActivate() end,
-	setteam = function(self, value) self:ChangeTeam(tonumber(value) or 0) end,
+	setteam = function(self, value) self:ChangeTeam(tonumber(value) or WETSAND.TEAM_UNASSIGNED) end,
 }

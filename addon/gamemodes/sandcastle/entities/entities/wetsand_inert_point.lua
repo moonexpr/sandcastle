@@ -13,7 +13,7 @@ end
 function ENT:Initialize()
 	local kv = self.tf2kv or {}
 	self.enabled = kv.startdisabled ~= "1"
-	self.team = tonumber(kv.teamnum) or 0
+	self.team = tonumber(kv.teamnum) or WETSAND.TEAM_UNASSIGNED
 end
 
 function ENT:UpdateTransmitState()
@@ -24,7 +24,7 @@ local INPUTS = {
 	enable = function(self) self.enabled = true end,
 	disable = function(self) self.enabled = false end,
 	toggle = function(self) self.enabled = not self.enabled end,
-	setteam = function(self, value) self.team = tonumber(value) or 0 end,
+	setteam = function(self, value) self.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED end,
 }
 
 function ENT:AcceptInput(name, activator, caller, value)

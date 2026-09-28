@@ -27,15 +27,18 @@ local function State(ent)
 end
 
 -- CTeamControlPoint::SetModel: the owning team's model, bodygroup 0 set to the
--- team, and skin 2 for neutral or team - 2 (0 RED, 1 BLU).
+-- team, and the team's skin (team - 2, neutral last).
+local TEAM_BODYGROUP = 0
+local POINT_SKIN = { [WETSAND.TEAM_RED] = 0, [WETSAND.TEAM_BLUE] = 1, [WETSAND.TEAM_UNASSIGNED] = 2 }
+
 function WETSAND.ApplyPointModel(ent)
 	local s = State(ent)
 	local team = s.owner
 	local model = s["team_model_" .. team]
 	if not model or model == "" then model = DEFAULT_MODEL end
 	if ent:GetModel() ~= model and util.IsValidModel(model) then ent:SetModel(model) end
-	ent:SetBodygroup(0, team)
-	ent:SetSkin(team == WETSAND.TEAM_UNASSIGNED and 2 or team - 2)
+	ent:SetBodygroup(TEAM_BODYGROUP, team)
+	ent:SetSkin(POINT_SKIN[team])
 	if bit.band(tonumber(s.spawnflags) or 0, SF_HIDE_MODEL) ~= 0 then ent:SetNoDraw(true) end
 end
 
@@ -253,7 +256,7 @@ end
 local INPUTS = {
 	-- CTeamControlPoint::InputSetOwner: a sounding capture only when a player sent it.
 	setowner = function(ent, value, activator, caller)
-		local team = tonumber(value) or 0
+		local team = tonumber(value) or WETSAND.TEAM_UNASSIGNED
 		if WETSAND.CapTeam(ent) == team or not PointsMayBeCaptured() then return end
 		HandleScoring(ent, team)
 		InternalSetOwner(ent, team, IsValid(caller) and caller:IsPlayer(), activator)

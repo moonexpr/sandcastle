@@ -5,9 +5,15 @@
 -- choice (CTFPlayer::SelectSpawnSpotByType). Pure: spawns are records
 -- { team, disabled, controlpoint, roundBlue, roundRed, spawnMode, matchSummary }.
 local ipairs, tonumber = ipairs, tonumber
+local Teams = require("foundation.teams")
+local NO_POINT = require("foundation.rounds").NO_POINT
 module(...)
 
-local RED, BLUE = 2, 3
+-- info_player_teamspawn's SpawnMode and MatchSummary keyvalues.
+SPAWN_MODE_NORMAL, SPAWN_MODE_TRIGGERED = 0, 1
+MATCH_SUMMARY_NONE, MATCH_SUMMARY_LOSER, MATCH_SUMMARY_WINNER = 0, 1, 2 -- podium spots
+
+local NOBODY, RED, BLUE = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
 
 local function Name(value)
 	if value == nil or value == "" then return nil end
@@ -17,13 +23,13 @@ end
 -- A record from the keyvalues the map gave the spawn (lowercased keys).
 function FromKeyValues(kv)
 	return {
-		team = tonumber(kv.teamnum) or 0,
+		team = tonumber(kv.teamnum) or NOBODY,
 		disabled = kv.startdisabled == "1",
 		controlpoint = Name(kv.controlpoint),
 		roundBlue = Name(kv.round_bluespawn),
 		roundRed = Name(kv.round_redspawn),
-		spawnMode = tonumber(kv.spawnmode) or 0,
-		matchSummary = tonumber(kv.matchsummary) or 0,
+		spawnMode = tonumber(kv.spawnmode) or SPAWN_MODE_NORMAL,
+		matchSummary = tonumber(kv.matchsummary) or MATCH_SUMMARY_NONE,
 	}
 end
 
@@ -31,7 +37,7 @@ end
 -- enabled, spawn mode Normal (Triggered spawns are only for a respawn
 -- override), and not a podium spot.
 function Valid(spawn, team)
-	return spawn.team == team and not spawn.disabled and spawn.spawnMode == 0 and spawn.matchSummary == 0
+	return spawn.team == team and not spawn.disabled and spawn.spawnMode == SPAWN_MODE_NORMAL and spawn.matchSummary == MATCH_SUMMARY_NONE
 end
 
 -- CTFGameRules::SetupSpawnPointsForRound: spawns tied to a point of the
@@ -64,10 +70,10 @@ function BaseControlPoint(points, team)
 		if not highest or p.index > highest.index then highest = p end
 		if not lowest or p.index < lowest.index then lowest = p end
 	end
-	if not lowest then return -1 end
+	if not lowest then return NO_POINT end
 	if highest.defaultOwner == team then return highest.index end
 	if lowest.defaultOwner == team then return lowest.index end
-	return -1
+	return NO_POINT
 end
 
 -- CTFGameRules::SetupOnRoundStart without mini-rounds: every spawn tied to a
@@ -88,7 +94,7 @@ end
 -- CTFGameRules::GetFarthestOwnedControlPoint(team, true). points: { index, owner, defaultOwner }.
 function FarthestOwnedPoint(team, points, controlSpawns)
 	local ownedEnd = BaseControlPoint(points, team)
-	if ownedEnd == -1 then return -1 end
+	if ownedEnd == NO_POINT then return NO_POINT end
 	local owner = {}
 	for _, p in ipairs(points) do owner[p.index] = p.owner end
 	local walk, enemyEnd = 1, #points - 1
@@ -106,7 +112,7 @@ end
 function RecalculateControlPointState(spawns, points, controlSpawns, pointIndex)
 	for _, team in ipairs({ RED, BLUE }) do
 		local farthest = FarthestOwnedPoint(team, points, controlSpawns)
-		if farthest ~= -1 then
+		if farthest ~= NO_POINT then
 			for _, s in ipairs(spawns) do
 				local index = s.controlpoint and pointIndex(s.controlpoint)
 				if index and s.team == team then s.disabled = index ~= farthest end

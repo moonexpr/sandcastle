@@ -106,7 +106,7 @@ end
 function WETSAND.Announce(text, team)
 	net.Start("tf2.announce")
 	net.WriteString(text)
-	net.WriteUInt(team or 0, 2)
+	net.WriteUInt(team or WETSAND.TEAM_UNASSIGNED, 2)
 	net.Broadcast()
 end
 

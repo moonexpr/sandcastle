@@ -19,7 +19,7 @@ end
 
 function ENT:Initialize()
 	self.enabled = self:Key("startdisabled", "0") ~= "1"
-	self.team = tonumber(self:Key("teamnum", 0)) or 0
+	self.team = tonumber(self:Key("teamnum", WETSAND.TEAM_UNASSIGNED)) or WETSAND.TEAM_UNASSIGNED
 	self.welcome = self:Key("defaultwelcome", "0") == "1"
 	self.fov = tonumber(self:Key("fov", 0)) or 0
 	-- CObserverPoint::Activate: the match summary camera stays off until the
@@ -59,7 +59,7 @@ end
 local INPUTS = {
 	enable = function(self) self.enabled = true end,
 	disable = function(self) self.enabled = false end,
-	setteam = function(self, value) self.team = tonumber(value) or 0 end,
+	setteam = function(self, value) self.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED end,
 }
 
 -- Other inputs (SetParent, Kill, ...) fall through to the engine.

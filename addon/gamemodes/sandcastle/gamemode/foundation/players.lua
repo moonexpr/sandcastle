@@ -1,6 +1,5 @@
 -- Player rules of TF2 as pure functions: pickup amounts, resupply, the
--- player conditions map triggers apply, and stuns. No GMod globals; the
--- modules that use it include it.
+-- player conditions map triggers apply, and stuns.
 local bit, ipairs, math, pairs = bit, ipairs, math, pairs
 module(...)
 
@@ -35,6 +34,7 @@ end
 
 -- ETFCond values (tf_shareddefs.h) of the conditions payload maps apply.
 COND = {
+	INVALID = -1,
 	INVULNERABLE = 5,
 	CRITBOOSTED = 11,
 	PHASE = 14,
@@ -53,8 +53,8 @@ COND = {
 }
 local C = COND
 
--- PERMANENT_CONDITION
-local PERMANENT = -1
+-- PERMANENT_CONDITION: a duration that never runs out.
+PERMANENT = -1
 
 -- conds maps a condition to the time it ends.
 function AddCond(conds, cond, duration, now)
@@ -90,10 +90,13 @@ end
 -- TF_STUN_* (tf_shareddefs.h)
 STUN = { MOVEMENT = 1, CONTROLS = 2, NO_EFFECTS = 32, LOSER_STATE = 64 }
 
--- CTriggerStun::StunEntity: stun_type 0 movement, 1 controls, 2 loser state.
+-- trigger_stun's stun_type keyvalue.
+STUN_TYPE = { MOVEMENT = 0, CONTROLS = 1, LOSER_STATE = 2 }
+
+-- CTriggerStun::StunEntity: every stun slows; the stronger types take more.
 function StunFlags(stunType)
-	if stunType == 1 then return STUN.MOVEMENT + STUN.CONTROLS end
-	if stunType == 2 then return STUN.MOVEMENT + STUN.LOSER_STATE end
+	if stunType == STUN_TYPE.CONTROLS then return STUN.MOVEMENT + STUN.CONTROLS end
+	if stunType == STUN_TYPE.LOSER_STATE then return STUN.MOVEMENT + STUN.LOSER_STATE end
 	return STUN.MOVEMENT
 end
 

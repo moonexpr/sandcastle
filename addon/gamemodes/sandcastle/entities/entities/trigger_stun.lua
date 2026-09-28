@@ -12,7 +12,8 @@ function ENT:TriggerInit()
 	self.delay = tonumber(self:Key("trigger_delay", 0)) or 0
 	self.duration = tonumber(self:Key("stun_duration", 0)) or 0
 	self.reduction = tonumber(self:Key("move_speed_reduction", 0)) or 0
-	self.flags = WETSAND.PlayerRules.StunFlags(tonumber(self:Key("stun_type", 0)) or 0)
+	local MOVEMENT = WETSAND.PlayerRules.STUN_TYPE.MOVEMENT
+	self.flags = WETSAND.PlayerRules.StunFlags(tonumber(self:Key("stun_type", MOVEMENT)) or MOVEMENT)
 	self.stunned = {}
 end
 

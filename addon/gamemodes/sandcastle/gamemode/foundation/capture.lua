@@ -7,20 +7,25 @@
 -- { kind = "numcappers", n, blocked } (SetNumCappers), { kind = "blocked", value,
 -- capping } (UpdateBlocked), { kind = "owner", old, team } (the area's new owner).
 local ipairs = ipairs
+local Teams = require("foundation.teams")
 module(...)
 
-local TEAMS = { 2, 3 }
+-- mp_blockstyle: whether a block ends the capture or pauses it.
+BLOCKSTYLE_BREAK, BLOCKSTYLE_PAUSE = 0, 1
+
+local NOBODY, RED, BLUE = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
+local TEAMS = { RED, BLUE }
 
 function New(owner)
 	return {
 		owner = owner,
 		capturing = false,
-		cappingTeam = 0,
+		cappingTeam = NOBODY,
 		timeRemaining = 0,
 		blocked = false,
 		lastReduction = 0,
-		touching = { [2] = 0, [3] = 0 },
-		teamInZone = 0,
+		touching = { [RED] = 0, [BLUE] = 0 },
+		teamInZone = NOBODY,
 	}
 end
 
@@ -36,7 +41,7 @@ end
 
 -- UpdateNumPlayers: the capping team's count goes to SetNumCappers.
 local function NumPlayers(s, ev, blocked)
-	if s.cappingTeam ~= 0 then
+	if s.cappingTeam ~= NOBODY then
 		ev[#ev + 1] = { kind = "numcappers", n = s.touching[s.cappingTeam], blocked = blocked }
 	end
 end
@@ -56,7 +61,7 @@ local function End(s, ev)
 	ev[#ev + 1] = { kind = "end", team = team }
 	ev[#ev + 1] = { kind = "owner", old = s.owner, team = team }
 	s.owner = team
-	s.capturing, s.cappingTeam, s.timeRemaining = false, 0, 0
+	s.capturing, s.cappingTeam, s.timeRemaining = false, NOBODY, 0
 	ev[#ev + 1] = { kind = "numcappers", n = 0, blocked = false }
 end
 
@@ -64,7 +69,7 @@ end
 local function BreakInto(s, ev)
 	if not s.capturing then return end
 	ev[#ev + 1] = { kind = "break", team = s.cappingTeam }
-	s.capturing, s.cappingTeam, s.timeRemaining = false, 0, 0
+	s.capturing, s.cappingTeam, s.timeRemaining = false, NOBODY, 0
 	ev[#ev + 1] = { kind = "numcappers", n = 0, blocked = false }
 end
 
@@ -77,7 +82,7 @@ end
 -- Record the counts; returns teams in the zone and whether any count changed.
 local function Survey(s, counts)
 	local teamsInZone, changed = 0, false
-	s.teamInZone = 0
+	s.teamInZone = NOBODY
 	for _, team in ipairs(TEAMS) do
 		if s.touching[team] ~= counts[team] then
 			s.touching[team] = counts[team]
@@ -88,7 +93,7 @@ local function Survey(s, counts)
 			s.teamInZone = team
 		end
 	end
-	if teamsInZone > 1 then s.teamInZone = 0 end
+	if teamsInZone > 1 then s.teamInZone = NOBODY end
 	return teamsInZone, changed
 end
 
@@ -109,14 +114,14 @@ local function Advance(s, ev, i, teamsInZone)
 	s.lastReduction = i.now
 	if teamsInZone > 1 then
 		SetBlocked(s, ev, true)
-		if i.blockstyle == 0 then BreakInto(s, ev) end
+		if i.blockstyle == BLOCKSTYLE_BREAK then BreakInto(s, ev) end
 		return
 	end
 	SetBlocked(s, ev, false)
 	local total = Total(s, i)
 	if s.cappingTeam == s.teamInZone then
 		s.timeRemaining = s.timeRemaining - reduction
-	elseif s.owner == 0 and s.teamInZone ~= 0 then
+	elseif s.owner == NOBODY and s.teamInZone ~= NOBODY then
 		s.timeRemaining = s.timeRemaining + reduction
 	elseif i.teamMayCapture(s.cappingTeam) then
 		-- caps deteriorate over time, six times as fast in overtime
@@ -155,10 +160,10 @@ function Step(s, i)
 		return ev
 	end
 	local teamsInZone, changed = Survey(s, i.counts)
-	-- mp_blockstyle 1: a block pauses the capture and tells the capping
+	-- BLOCKSTYLE_PAUSE: a block pauses the capture and tells the capping
 	-- team's listeners there are no cappers (-1 on OnNumCappersChanged2)
 	local blocked = false
-	if i.blockstyle == 1 and s.capturing and teamsInZone > 1 then
+	if i.blockstyle == BLOCKSTYLE_PAUSE and s.capturing and teamsInZone > 1 then
 		blocked = true
 		for _, team in ipairs(TEAMS) do
 			if s.touching[team] ~= 0 then
@@ -199,7 +204,7 @@ end
 -- HandleRespawnTimeAdjustments: undo the old owner's team_spawn_N, apply the new one's.
 function SpawnAdjustments(old, new, spawnAdjust)
 	local out = {}
-	if old >= 2 and spawnAdjust[old] ~= 0 then out[#out + 1] = { team = old, seconds = -spawnAdjust[old] } end
-	if new >= 2 and spawnAdjust[new] ~= 0 then out[#out + 1] = { team = new, seconds = spawnAdjust[new] } end
+	if old >= Teams.FIRST_GAME_TEAM and spawnAdjust[old] ~= 0 then out[#out + 1] = { team = old, seconds = -spawnAdjust[old] } end
+	if new >= Teams.FIRST_GAME_TEAM and spawnAdjust[new] ~= 0 then out[#out + 1] = { team = new, seconds = spawnAdjust[new] } end
 	return out
 end

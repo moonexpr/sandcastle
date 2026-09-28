@@ -12,7 +12,7 @@ local STALEMATE_TIMER = 1
 function ENT:KeyValue(key, value)
 	local k = string.lower(key)
 	if k == "teamnum" then
-		self.team = tonumber(value) or 0
+		self.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED
 	elseif k == "force_map_reset" then
 		self.forceMapReset = value ~= "0"
 	elseif k == "switch_teams" then
@@ -25,7 +25,7 @@ function ENT:KeyValue(key, value)
 end
 
 function ENT:Initialize()
-	self.team = self.team or 0
+	self.team = self.team or WETSAND.TEAM_UNASSIGNED
 	if self.forceMapReset == nil then self.forceMapReset = true end
 	self.switchTeams = self.switchTeams or false
 	self.winReason = self.winReason or DEFEND_UNTIL_TIME_LIMIT
@@ -52,7 +52,7 @@ function ENT:AcceptInput(name, activator, caller, value)
 	if input == "roundwin" then
 		self:RoundWin()
 	elseif input == "setteam" then
-		self.team = tonumber(value) or 0
+		self.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED
 	else
 		return false
 	end

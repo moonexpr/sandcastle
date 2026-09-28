@@ -23,10 +23,10 @@ end
 -- together with that call (see the tf2.visualizers Think hook below).
 local visualizers = setmetatable({}, { __mode = "k" })
 
--- The team this forcefield stops the enemies of, or 0 when it stops nobody.
+-- The team this forcefield stops the enemies of, or nobody.
 function ENT:CollisionTeam()
-	if not (self:GetEnabled() and self:GetFieldOn()) then return 0 end
-	if WETSAND.State() == WETSAND.STATE.TEAM_WIN then return 0 end
+	if not (self:GetEnabled() and self:GetFieldOn()) then return WETSAND.TEAM_UNASSIGNED end
+	if WETSAND.State() == WETSAND.STATE.TEAM_WIN then return WETSAND.TEAM_UNASSIGNED end
 	return self:GetRoomTeam()
 end
 
@@ -94,7 +94,7 @@ function ENT:KeyValue(key, value)
 	elseif k == "startdisabled" then
 		self.startDisabled = value == "1"
 	elseif k == "teamnum" then
-		self.keyTeam = tonumber(value) or 0
+		self.keyTeam = tonumber(value) or WETSAND.TEAM_UNASSIGNED
 	elseif string.sub(key, 1, 2) == "On" then
 		self:StoreOutput(key, value)
 	end
@@ -106,7 +106,7 @@ function ENT:Initialize()
 	self:SetSolid(SOLID_BSP)
 	if self.solidToEnemies == nil then self.solidToEnemies = true end
 	self:SetEnabled(not self.startDisabled)
-	self:SetRoomTeam(self.keyTeam or 0)
+	self:SetRoomTeam(self.keyTeam or WETSAND.TEAM_UNASSIGNED)
 	self:SetRoomActive(true)
 	self:SetFieldOn(true)
 	self:InitCollision()

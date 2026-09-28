@@ -7,10 +7,10 @@
 --   alive, deathTime (players), enabled, associatedTeam (points), train (entities) }.
 -- Viewer: { id, team }. Rules: { forcecamera, teamWin, now }.
 local ipairs = ipairs
+local Teams = require("foundation.teams")
 module(...)
 
-TEAM_SPECTATOR = 1
-FIRST_GAME_TEAM = 2
+local NOBODY, SPECTATOR, FIRST_GAME_TEAM = Teams.UNASSIGNED, Teams.SPECTATOR, Teams.FIRST_GAME_TEAM
 
 -- mp_forcecamera values (shareddefs.h OBS_ALLOW_*)
 FORCE_ALL = 0
@@ -88,8 +88,8 @@ end
 local function ValidEntity(viewer, target, rules)
 	if target.kind == "point" and not CanUsePoint(viewer, target, rules) then return false end
 	if target.train and rules.teamWin then return false end
-	if viewer.team == TEAM_SPECTATOR then return true end
-	if target.team == 0 and rules.forcecamera ~= FORCE_NONE then return true end
+	if viewer.team == SPECTATOR then return true end
+	if target.team == NOBODY and rules.forcecamera ~= FORCE_NONE then return true end
 	return ForceCameraAllows(viewer, target.team, rules)
 end
 
@@ -98,7 +98,7 @@ local function ValidPlayer(viewer, target, rules)
 	if not target.alive then
 		if not target.deathTime or rules.now > target.deathTime + TIMES.watchDead then return false end
 	end
-	if viewer.team == TEAM_SPECTATOR then return true end
+	if viewer.team == SPECTATOR then return true end
 	return ForceCameraAllows(viewer, target.team, rules)
 end
 

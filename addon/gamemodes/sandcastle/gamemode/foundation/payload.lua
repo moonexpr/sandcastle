@@ -3,9 +3,15 @@
 -- it recedes, how far it has come, and when the announcer and the capture
 -- alarm sound. The entity feeds them what it reads from the world.
 local ipairs, math, table = ipairs, math, table
+local Teams = require("foundation.teams")
+local RESTRICT_NEITHER = require("foundation.rounds").RESTRICT_NEITHER
 module(...)
 
 HILL_NONE, HILL_UP, HILL_DOWN = 0, 1, 2
+-- InternalSetNumTrainCappers(-1): the enemy is on the cart, which stands still.
+CAPPERS_BLOCKED = -1
+-- m_iTrainSpeedLevel while the cart rolls back.
+SPEED_LEVEL_BACKWARDS = -1
 
 ALERT_DISTANCE = 750           -- TEAM_TRAIN_ALERT_DISTANCE: the announcer's warning
 ALARM_DISTANCE = 200           -- TEAM_TRAIN_ALARM_DISTANCE: the looping alarm at the point
@@ -17,7 +23,7 @@ local PUSH_SPEED = { 0.55, 0.77, 1.0 }
 
 local function PushSpeed(numCappers, hill)
 	if hill == HILL_DOWN then return 1.0 end
-	return PUSH_SPEED[math.min(numCappers, 3)]
+	return PUSH_SPEED[math.min(numCappers, #PUSH_SPEED)]
 end
 
 local function IdleSpeed(s)
@@ -36,7 +42,7 @@ function TrainSpeed(s, startReceding)
 		speed, receding = RECEDE_SPEED, true
 	elseif s.numCappers > 0 then
 		speed, receding = PushSpeed(s.numCappers, s.hill), false
-	elseif s.numCappers == -1 then
+	elseif s.numCappers == CAPPERS_BLOCKED then
 		-- a blocked cart stands still unless it is rolling downhill
 		speed = s.hill == HILL_DOWN and 1.0 or 0
 	else
@@ -46,10 +52,10 @@ function TrainSpeed(s, startReceding)
 	return speed, receding
 end
 
--- WatcherThink's m_iTrainSpeedLevel: -1 backwards (0 once stopped at a dead
+-- WatcherThink's m_iTrainSpeedLevel: backwards (0 once stopped at a dead
 -- end), else 0..3 by the hud_min_speed_level_1..3 thresholds.
 function SpeedLevel(desiredSpeed, currentSpeed, levels)
-	if desiredSpeed < 0 then return currentSpeed == 0 and 0 or -1 end
+	if desiredSpeed < 0 then return currentSpeed == 0 and 0 or SPEED_LEVEL_BACKWARDS end
 	for level = 3, 1, -1 do
 		if desiredSpeed > levels[level] then return level end
 	end
@@ -115,14 +121,16 @@ end
 -- The capture alarm: a loop at the final point while the train is within
 -- ALARM_DISTANCE of the goal. Actions: "start" (loop), "stop" (loop and
 -- singles), "single" (one Cart.WarningSingle).
+local NO_END = -1 -- endAt of an alarm that is not looping
+
 function NewAlarm()
-	return { playing = false, played = false, endAt = -1, nextSingle = nil }
+	return { playing = false, played = false, endAt = NO_END, nextSingle = nil }
 end
 
 -- StopCaptureAlarm
 local function StopAlarmInto(a, out)
 	if a.playing or a.nextSingle then out[#out + 1] = "stop" end
-	a.playing, a.endAt, a.nextSingle = false, -1, nil
+	a.playing, a.endAt, a.nextSingle = false, NO_END, nil
 end
 
 -- StopCaptureAlarm on its own (RoundActivate, Enable, Disable); returns the actions.
@@ -200,7 +208,7 @@ end
 
 -- CTeamControlPointRound/Master::TeamOwnsAllPoints. points = { { group, owner } };
 -- with overrideIndex, that point is taken as owned by newTeam. Returns the
--- team owning every point of some group, else 0.
+-- team owning every point of some group, else nobody.
 function TeamOwnsAllPoints(points, overrideIndex, newTeam)
 	local winning, order = {}, {}
 	for i, point in ipairs(points) do
@@ -209,23 +217,23 @@ function TeamOwnsAllPoints(points, overrideIndex, newTeam)
 		if winning[g] == nil then
 			winning[g] = owner
 			order[#order + 1] = g
-		elseif winning[g] ~= 0 and winning[g] ~= owner then
-			winning[g] = 0
+		elseif winning[g] ~= Teams.UNASSIGNED and winning[g] ~= owner then
+			winning[g] = Teams.UNASSIGNED
 		end
 	end
 	table.sort(order)
 	for _, g in ipairs(order) do
-		if winning[g] >= 2 then return winning[g] end
+		if winning[g] >= Teams.FIRST_GAME_TEAM then return winning[g] end
 	end
-	return 0
+	return Teams.UNASSIGNED
 end
 
 -- CTeamControlPointRound::IsPlayable; invalidCapWinner is the round's
--- cpr_restrict_team_cap_win (1: neither team wins it by capping).
+-- cpr_restrict_team_cap_win (RESTRICT_NEITHER: any team wins it by capping).
 function IsPlayable(points, invalidCapWinner)
-	if invalidCapWinner == 1 then return true end
+	if invalidCapWinner == RESTRICT_NEITHER then return true end
 	local winners = TeamOwnsAllPoints(points)
-	return not (winners >= 2 and winners ~= invalidCapWinner)
+	return not (winners >= Teams.FIRST_GAME_TEAM and winners ~= invalidCapWinner)
 end
 
 -- WatcherThink's bFinalPointInMap: without mini-rounds, whether a team that

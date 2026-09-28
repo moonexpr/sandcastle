@@ -16,7 +16,7 @@ end
 function ENT:Think()
 	self:NextThink(CurTime() + 0.1)
 	if not self.enabled then return true end
-	local now, state, winner = CurTime(), WETSAND.State(), GetGlobal2Int("tf2.winner", 0)
+	local now, state, winner = CurTime(), WETSAND.State(), GetGlobal2Int("tf2.winner", WETSAND.TEAM_UNASSIGNED)
 	for _, ply in ipairs(WETSAND.PlayersInside(self)) do
 		if now >= (ply.tf2NextRegen or 0) and WETSAND.TeamRules.RegenerateAllowed(self.team, ply:Team(), state, winner) then
 			self:Regenerate(ply)

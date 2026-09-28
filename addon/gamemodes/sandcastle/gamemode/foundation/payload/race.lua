@@ -5,16 +5,17 @@
 -- as CTFGameRules does it (PlayTrainCaptureAlert, Helltower lines): by each
 -- watcher's distance along its track.
 local pairs, string = pairs, string
+local Teams = require("foundation.teams")
 module(...)
 
-local RED, BLU = 2, 3
+local NOBODY, RED, BLU = Teams.UNASSIGNED, Teams.RED, Teams.BLUE
 
--- distances = { [team] = distance along track }; the team ahead, or 0 when level.
+-- distances = { [team] = distance along track }; the team ahead, or nobody when level.
 function Leader(distances)
 	local red, blu = distances[RED] or 0, distances[BLU] or 0
 	if red > blu then return RED end
 	if blu > red then return BLU end
-	return 0
+	return NOBODY
 end
 
 -- CTeamTrainWatcherMaster::FireGameEvent("teamplay_round_win"): winner and

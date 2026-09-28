@@ -9,7 +9,7 @@ ENT.Base = "base_filter"
 function ENT:KeyValue(key, value)
 	local k = string.lower(key)
 	if k == "teamnum" then
-		self.team = tonumber(value) or 0
+		self.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED
 	elseif k == "negated" then
 		-- Hammer sometimes stores the choice's label ("Allow entities that
 		-- match criteria") rather than 0/1; only "1" negates.
@@ -22,14 +22,14 @@ function ENT:KeyValue(key, value)
 end
 
 function ENT:Initialize()
-	self.team = self.team or 0
+	self.team = self.team or WETSAND.TEAM_UNASSIGNED
 	self.negated = self.negated or false
 end
 
 -- Team numbers are compared raw, as TF2 does: a player on another addon's
 -- team matches neither RED nor BLU.
 function ENT:PassesFilter(trigger, ent)
-	return WETSAND.TeamRules.FilterPasses(self.team, self.negated, ent:Team(), WETSAND.State(), GetGlobal2Int("tf2.winner", 0))
+	return WETSAND.TeamRules.FilterPasses(self.team, self.negated, ent:Team(), WETSAND.State(), GetGlobal2Int("tf2.winner", WETSAND.TEAM_UNASSIGNED))
 end
 
 -- CFilterTFTeam::InputRoundActivate
@@ -40,7 +40,7 @@ function ENT:RoundActivate()
 end
 
 local INPUTS = {
-	setteam = function(self, value) self.team = tonumber(value) or 0 end,
+	setteam = function(self, value) self.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED end,
 	roundactivate = function(self) self:RoundActivate() end,
 	-- CFilterTFTeam::InputRoundSpawn does nothing.
 	roundspawn = function() end,

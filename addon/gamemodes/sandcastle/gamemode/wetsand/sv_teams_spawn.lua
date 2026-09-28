@@ -24,7 +24,7 @@ end
 local SPAWN_INPUTS = {
 	enable = function(s) s.disabled = false end,
 	disable = function(s) s.disabled = true end,
-	setteam = function(s, value) s.team = tonumber(value) or 0 end,
+	setteam = function(s, value) s.team = tonumber(value) or WETSAND.TEAM_UNASSIGNED end,
 	roundspawn = function() end,
 }
 
@@ -68,7 +68,7 @@ local function ControlPoints()
 		points[#points + 1] = {
 			index = WETSAND.PointIndex(ent),
 			owner = WETSAND.CapTeam(ent),
-			defaultOwner = tonumber(WETSAND.KeyValues(ent).point_default_owner) or 0,
+			defaultOwner = tonumber(WETSAND.KeyValues(ent).point_default_owner) or WETSAND.TEAM_UNASSIGNED,
 		}
 	end
 	return points

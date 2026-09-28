@@ -1,7 +1,9 @@
 local T = dofile("tests/harness.lua")
 local L = T.require("foundation.teams")
 
-local UNASSIGNED, SPEC, RED, BLU = 0, 1, 2, 3
+local STATE = T.require("foundation.rounds.state")
+
+local UNASSIGNED, SPEC, RED, BLU = L.UNASSIGNED, L.SPECTATOR, L.RED, L.BLUE
 
 -- TF2's configuration: BLU left, RED right (Teammenu.res).
 local function Teams(blu, red)
@@ -107,10 +109,11 @@ T.test("limit 0 disables no team", function()
 end)
 
 T.test("any number of teams is laid out and checked", function()
+	local A, B, C = 2, 3, 4 -- any game's team numbers
 	local teams = {
-		{ index = 2, name = "A", color = "a", count = 2, command = "a" },
-		{ index = 3, name = "B", color = "b", count = 1, command = "b" },
-		{ index = 4, name = "C", color = "c", count = 0, command = "c" },
+		{ index = A, name = "A", color = "a", count = 2, command = "a" },
+		{ index = B, name = "B", color = "b", count = 1, command = "b" },
+		{ index = C, name = "C", color = "c", count = 0, command = "c" },
 	}
 	local menu = L.TeamMenu(teams, UNASSIGNED, 1, {})
 	T.eq(#menu.teams, 3, "three teams")
@@ -122,19 +125,19 @@ end)
 -- CTFTeamMenu::ShowPanel: when the menu may open
 
 T.test("the menu opens during a round and for anyone before a team win", function()
-	T.eq(L.TeamMenuAllowed(4, RED, 0), true, "running")
-	T.eq(L.TeamMenuAllowed(4, UNASSIGNED, 0), true, "new player")
+	T.eq(L.TeamMenuAllowed(STATE.RND_RUNNING, RED, UNASSIGNED), true, "running")
+	T.eq(L.TeamMenuAllowed(STATE.RND_RUNNING, UNASSIGNED, UNASSIGNED), true, "new player")
 end)
 
 T.test("during a team win only the winners, spectators and the unassigned may open it", function()
-	T.eq(L.TeamMenuAllowed(L.STATE_TEAM_WIN, RED, BLU), false, "loser")
-	T.eq(L.TeamMenuAllowed(L.STATE_TEAM_WIN, BLU, BLU), true, "winner")
-	T.eq(L.TeamMenuAllowed(L.STATE_TEAM_WIN, SPEC, BLU), true, "spectator")
-	T.eq(L.TeamMenuAllowed(L.STATE_TEAM_WIN, UNASSIGNED, BLU), true, "unassigned")
+	T.eq(L.TeamMenuAllowed(STATE.TEAM_WIN, RED, BLU), false, "loser")
+	T.eq(L.TeamMenuAllowed(STATE.TEAM_WIN, BLU, BLU), true, "winner")
+	T.eq(L.TeamMenuAllowed(STATE.TEAM_WIN, SPEC, BLU), true, "spectator")
+	T.eq(L.TeamMenuAllowed(STATE.TEAM_WIN, UNASSIGNED, BLU), true, "unassigned")
 end)
 
 T.test("nobody opens it once the game is over", function()
-	T.eq(L.TeamMenuAllowed(L.STATE_GAME_OVER, UNASSIGNED, 0), false)
+	T.eq(L.TeamMenuAllowed(STATE.GAME_OVER, UNASSIGNED, UNASSIGNED), false)
 end)
 
 T.finish()
