@@ -1,6 +1,8 @@
--- func_regenerate: the resupply locker volume. A player of its team who walks
--- in is refilled to full health and ammo, at most once every 3 seconds, and
--- the locker prop plays open then close (CRegenerateZone::Regenerate).
+-- func_regenerate (CRegenerateZone): the resupply locker volume. A player it
+-- serves (its team, or during team win the winners at every locker, never
+-- in a stalemate) is resupplied at most once every 3 seconds
+-- (CTFPlayer::Regenerate), hears Regenerate.Touch alone, and the locker prop
+-- opens, then closes a second before the next use.
 ENT.Type = "brush"
 ENT.Base = "tf2_brush_volume"
 
@@ -14,21 +16,20 @@ end
 function ENT:Think()
 	self:NextThink(CurTime() + 0.1)
 	if not self.enabled then return true end
-	local now = CurTime()
+	local now, state, winner = CurTime(), TF2.State(), GetGlobal2Int("tf2.winner", 0)
 	for _, ply in ipairs(TF2.PlayersInside(self)) do
-		if self:AllowsTeam(TF2.TeamOf(ply)) and now >= (ply.tf2NextRegen or 0) then
+		if now >= (ply.tf2NextRegen or 0) and TF2.TeamRules.RegenerateAllowed(self.team, ply:Team(), state, winner) then
 			self:Regenerate(ply)
 		end
 	end
 	return true
 end
 
+-- CRegenerateZone::Regenerate
 function ENT:Regenerate(ply)
+	TF2.RegeneratePlayer(ply)
 	ply.tf2NextRegen = CurTime() + NEXT_USE_TIME
-	ply:SetHealth(math.max(ply:Health(), ply:GetMaxHealth()))
-	ply:Extinguish()
-	TF2.GiveAmmoFraction(ply, 1.0)
-	ply:EmitSound(SOUND)
+	TF2.PlaySoundTo(ply, ply, SOUND)
 	local prop = TF2.FindByName(self.associatedModel)
 	if IsValid(prop) then
 		prop:Fire("SetAnimation", "open")
