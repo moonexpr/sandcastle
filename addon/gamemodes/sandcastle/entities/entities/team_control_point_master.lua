@@ -1,17 +1,24 @@
--- team_control_point_master: declares a round won when one team owns every
--- control point of the active round (or every point, with no rounds).
+-- team_control_point_master: chooses the mini-round to play and declares a
+-- round won when one team owns every point in play (CTeamControlPointMaster,
+-- team_control_point_master.cpp). Without team_control_point_rounds every
+-- control point is in play.
 ENT.Type = "point"
 ENT.Base = "base_point"
 
--- Win reason passed to tf_gamerules (WINREASON_ALL_POINTS_CAPTURED).
-local WINREASON_ALL_POINTS_CAPTURED = 1
+local KEYS = {
+	cpm_restrict_team_cap_win = function(self, v) self.restrictTeam = tonumber(v) or 0 end,
+	switch_teams = function(self, v) self.switchTeams = v == "1" end,
+	score_style = function(self, v) self.scoreStyle = tonumber(v) or 0 end,
+	play_all_rounds = function(self, v) self.playAllRounds = v == "1" end,
+	partial_cap_points_rate = function(self, v) self.partialCapRate = tonumber(v) or 0 end,
+	startdisabled = function(self, v) self.disabled = v == "1" end,
+	caplayout = function(self, v) self.capLayout = v end,
+}
 
 function ENT:KeyValue(key, value)
 	local k = string.lower(key)
-	if k == "cpm_restrict_team_cap_win" then
-		self.restrictTeam = tonumber(value) or 0
-	elseif k == "switch_teams" then
-		self.switchTeams = value == "1"
+	if KEYS[k] then
+		KEYS[k](self, value)
 	elseif string.sub(key, 1, 2) == "On" then
 		self:StoreOutput(key, value)
 	end
@@ -19,57 +26,216 @@ end
 
 function ENT:Initialize()
 	self.restrictTeam = self.restrictTeam or 0
-	self.enabled = true
-	hook.Add("TF2PointCaptured", self, self.CheckWinConditions)
+	self.switchTeams = self.switchTeams or false
+	self.scoreStyle = self.scoreStyle or 0
+	self.playAllRounds = self.playAllRounds or false
+	self.partialCapRate = self.partialCapRate or 0
+	self.disabled = self.disabled or false
+	self.current = NULL
+	self.firstRoundAfterRestart = true
+	self:FindRounds()
 end
 
 function ENT:UpdateTransmitState()
 	return TRANSMIT_NEVER
 end
 
--- The points in play: the highest-priority team_control_point_round's list,
--- or every control point when the map has no rounds.
-function ENT:PointsInPlay()
-	local best
-	for _, round in ipairs(ents.FindByClass("team_control_point_round")) do
-		if not best or round.priority > best.priority then best = round end
-	end
-	if best then return best:Points(), best.restrictTeam end
-	return ents.FindByClass("team_control_point"), self.restrictTeam
+function ENT:IsActive()
+	return not self.disabled
 end
 
+-- Rounds --------------------------------------------------------------------------------
+
+function ENT:FindRounds()
+	self.rounds = ents.FindByClass("team_control_point_round")
+end
+
+function ENT:PlayingMiniRounds()
+	return #self.rounds > 0
+end
+
+function ENT:CurrentRound()
+	return self.current
+end
+
+function ENT:ScorePerCapture()
+	return self.scoreStyle == 1
+end
+
+function ENT:IsInRound(point)
+	if self:PlayingMiniRounds() and IsValid(self.current) then return self.current:HasPoint(point) end
+	return true
+end
+
+function ENT:RoundInfos()
+	local infos = {}
+	for i, r in ipairs(self.rounds) do
+		infos[i] = { name = r:GetName(), priority = r.priority, playable = r:IsPlayable() }
+	end
+	return infos
+end
+
+function ENT:NumPlayable()
+	return TF2.RoundsLib.PlayableCount(self:RoundInfos())
+end
+
+-- The stage of a multi-stage map for the HUD: the current round's place in
+-- priority order.
+function ENT:PublishStage()
+	local stage, name = 0, ""
+	if IsValid(self.current) then
+		for i, r in ipairs(self.rounds) do
+			if r == self.current then stage = TF2.RoundsLib.StageOf(self:RoundInfos(), i) end
+		end
+		name = self.current.printName
+	end
+	SetGlobal2Int("tf2.round.stage", stage)
+	SetGlobal2Int("tf2.round.stages", #self.rounds)
+	SetGlobal2String("tf2.round.name", name)
+end
+
+-- GetControlPointRoundToPlay and RegisterRoundBeingPlayed. The gamerules
+-- remember the rounds played (CTeamplayRoundBasedRules::AddPlayedRound).
+function ENT:ChooseRound()
+	local rules = TF2.Rules
+	local history = {
+		previous = rules.previousRounds,
+		first = rules.firstRoundPlayed,
+		firstAfterRestart = self.firstRoundAfterRestart,
+	}
+	local i = TF2.RoundsLib.ChooseRound(self:RoundInfos(), history, math.random)
+	if not i then
+		self.current = NULL
+		self:PublishStage()
+		return
+	end
+	self.current = self.rounds[i]
+	local name = self.current:GetName()
+	rules:AddPlayedRound(name)
+	if self.firstRoundAfterRestart then
+		rules.firstRoundPlayed = name
+		self.firstRoundAfterRestart = false
+	end
+	self:PublishStage()
+	self.current:FireOnStart()
+	hook.Run("TF2MiniRoundStart", self.current)
+end
+
+-- CTeamControlPointMaster::InputRoundSpawn
+function ENT:RoundSpawn()
+	self:FindRounds()
+end
+
+-- CTeamControlPointMaster::InputRoundActivate
+function ENT:RoundActivate()
+	if self:PlayingMiniRounds() and not IsValid(self.current) then self:ChooseRound() end
+	self:PublishStage()
+end
+
+-- Called by the gamerules as the next round begins (PreviousRoundEnd).
+function ENT:FireRoundEndOutput()
+	if not IsValid(self.current) then return end
+	self.current:FireOnEnd()
+	self.current = NULL
+end
+
+-- Winning ---------------------------------------------------------------------------------
+
+local function PointStates(points, override, overrideTeam)
+	local states = {}
+	for i, p in ipairs(points) do
+		states[i] = { owner = p == override and overrideTeam or TF2.CapTeam(p), group = TF2.PointGroup(p) }
+	end
+	return states
+end
+
+-- CTeamControlPointMaster::WouldNewCPOwnerWinGame (over every point).
+function ENT:WouldNewOwnerWin(point, team)
+	local points = TF2.ControlPoints()
+	return TF2.RoundsLib.TeamOwnsAllPoints(PointStates(points, point, team)) == team
+end
+
+function ENT:FireTeamWinOutput(team)
+	self:TriggerOutput(team == TF2.TEAM_RED and "OnWonByTeam1" or "OnWonByTeam2", self)
+end
+
+-- A mini-round win resets the map only when no playable round is left, and
+-- only that final win switches teams.
+function ENT:DeclareWinner(team)
+	local forceMapReset = true
+	if self:PlayingMiniRounds() then forceMapReset = self:NumPlayable() == 0 end
+	TF2.Rules:SetWinningTeam(team, TF2.RoundsLib.WINREASON.ALL_POINTS_CAPTURED, forceMapReset, forceMapReset and self.switchTeams)
+	self:FireTeamWinOutput(team)
+end
+
+-- CTeamControlPointMaster::CheckWinConditions
 function ENT:CheckWinConditions()
-	if not self.enabled then return end
-	local points, restrictTeam = self:PointsInPlay()
-	if #points == 0 then return end
-	local owner = TF2.CapTeam(points[1])
-	if owner == TF2.TEAM_UNASSIGNED or owner == restrictTeam then return end
-	for _, point in ipairs(points) do
-		if TF2.CapTeam(point) ~= owner then return end
+	if self.disabled or not IsValid(TF2.Rules) then return end
+	local winner
+	if self:PlayingMiniRounds() then
+		if not IsValid(self.current) then return end
+		winner = self.current:CheckWinConditions()
+	else
+		winner = TF2.RoundsLib.RoundWinner(self.restrictTeam, PointStates((TF2.ControlPoints())))
 	end
-	self:Win(owner)
+	if winner then self:DeclareWinner(winner) end
 end
 
-function ENT:Win(team)
-	if team == TF2.TEAM_RED then self:TriggerOutput("OnWonByTeam1", self) end
-	if team == TF2.TEAM_BLUE then self:TriggerOutput("OnWonByTeam2", self) end
-	if IsValid(TF2.Rules) then
-		TF2.Rules:SetWinningTeam(team, WINREASON_ALL_POINTS_CAPTURED, true, self.switchTeams)
-	end
+-- CPMThink
+function ENT:Think()
+	self:NextThink(CurTime() + 0.2)
+	if IsValid(TF2.Rules) and TF2.Rules:PointsMayBeCaptured() then self:CheckWinConditions() end
+	return true
 end
+
+-- CTeamControlPointMaster::InternalSetWinner: team 0 is a stalemate.
+function ENT:SetWinner(team)
+	if team == TF2.TEAM_UNASSIGNED then
+		local forceMapReset = not self:PlayingMiniRounds() or self:NumPlayable() == 0
+		TF2.Rules:SetStalemate(TF2.RoundsLib.STALEMATE.TIMER, forceMapReset)
+		return
+	end
+	self:DeclareWinner(team)
+end
+
+-- InputSetWinnerAndForceCaps: the survivors of sudden death take every point in play.
+function ENT:SetWinnerAndForceCaps(team)
+	for _, point in ipairs(TF2.ControlPoints()) do
+		if self:IsInRound(point) then TF2.ForcePointOwner(point, team) end
+	end
+	self:SetWinner(team)
+end
+
+-- The rounds a team still has to win to take every point (CalcNumRoundsRemaining).
+function ENT:RoundsRemaining(team)
+	local points, rankOf = TF2.ControlPoints()
+	local states = {}
+	for i, p in ipairs(points) do states[i] = { owner = TF2.CapTeam(p) } end
+	local rounds = {}
+	for i, r in ipairs(self.rounds) do
+		local indices = {}
+		for _, p in ipairs(r:Points()) do indices[#indices + 1] = rankOf[p] + 1 end
+		rounds[i] = { restrict = r.restrictTeam, points = indices }
+	end
+	return TF2.RoundsLib.RoundsRemaining(team, rounds, states)
+end
+
+local INPUTS = {
+	enable = function(self) self.disabled = false end,
+	disable = function(self) self.disabled = true end,
+	setwinner = function(self, value) self:SetWinner(tonumber(value) or 0) end,
+	setwinnerandforcecaps = function(self, value) self:SetWinnerAndForceCaps(tonumber(value) or 0) end,
+	roundspawn = function(self) self:RoundSpawn() end,
+	roundactivate = function(self) self:RoundActivate() end,
+	-- The HUD here lays points out along the cart track.
+	setcaplayout = function(self, value) self.capLayout = value end,
+	setcaplayoutcustompositionx = function() end,
+	setcaplayoutcustompositiony = function() end,
+}
 
 function ENT:AcceptInput(name, activator, caller, value)
-	local input = string.lower(name)
-	if input == "setwinner" then
-		self:Win(tonumber(value) or 0)
-	elseif input == "enable" then
-		self.enabled = true
-	elseif input == "disable" then
-		self.enabled = false
-	elseif input == "setcaplayout" or input == "setcaplayoutcustompositionx" or input == "setcaplayoutcustompositiony" then
-		-- HUD layout only; the HUD here lays points out along the cart track.
-	else
-		return false
-	end
+	local handler = INPUTS[string.lower(name)]
+	if not handler then return false end
+	handler(self, value)
 	return true
 end
