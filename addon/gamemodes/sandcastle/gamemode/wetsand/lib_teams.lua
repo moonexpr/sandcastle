@@ -7,6 +7,7 @@ local UNASSIGNED, SPECTATOR, RED, BLUE = 0, 1, 2, 3
 L.AUTO = "auto"
 L.STATE_TEAM_WIN = 5 -- GR_STATE_TEAM_WIN
 L.STATE_STALEMATE = 7 -- GR_STATE_STALEMATE
+L.STATE_GAME_OVER = 8 -- GR_STATE_GAME_OVER
 
 -- HandleCommand_JoinTeam: g_aTeamNames, compared case-insensitively. A name
 -- it does not know leaves the command's initial choice, RED. "blu" is
@@ -37,27 +38,37 @@ function L.AutoTeam(red, blue)
 	return BLUE
 end
 
-local function Other(team)
-	if team == RED then return BLUE end
-	return RED
+-- counts[t] is the number of players on each game team t now, the mover
+-- included; the game teams are exactly its keys.
+
+local function GameTeams(counts)
+	local teams = {}
+	for t in pairs(counts) do teams[#teams + 1] = t end
+	table.sort(teams)
+	return teams
 end
 
--- CTeamplayRoundBasedRules::WouldChangeUnbalanceTeams. counts[t] is the
--- number of players on RED/BLU now, the mover included.
+-- CTeamplayRoundBasedRules::WouldChangeUnbalanceTeams.
 function L.WouldUnbalance(counts, newTeam, currentTeam, limit)
-	if newTeam == currentTeam or limit <= 0 or newTeam < RED then return false end
+	if newTeam == currentTeam or limit <= 0 or counts[newTeam] == nil then return false end
 	local joined = counts[newTeam] + 1
-	local other = Other(newTeam)
-	local left = counts[other]
-	if other == currentTeam then left = math.max(0, left - 1) end
-	return joined - left > limit
+	for t, n in pairs(counts) do
+		if t ~= newTeam then
+			if t == currentTeam then n = math.max(0, n - 1) end
+			if joined - n > limit then return true end
+		end
+	end
+	return false
 end
 
 -- CTeamplayRoundBasedRules::AreTeamsUnbalanced: heavy and light team, or nil.
 function L.Unbalanced(counts, limit)
 	if limit <= 0 then return nil end
-	local heavy, light = RED, BLUE
-	if counts[BLUE] > counts[RED] then heavy, light = BLUE, RED end
+	local heavy, light
+	for _, t in ipairs(GameTeams(counts)) do
+		if not heavy or counts[t] > counts[heavy] then heavy = t end
+		if not light or counts[t] < counts[light] then light = t end
+	end
 	if counts[heavy] - counts[light] > limit then return heavy, light end
 	return nil
 end
@@ -132,6 +143,62 @@ function L.RegenerateAllowed(zoneTeam, playerTeam, state, winner)
 		return false
 	end
 	return state ~= L.STATE_STALEMATE
+end
+
+-- The team menu (CTFTeamMenu) --------------------------------------------------
+
+-- CTFTeamMenu::ShowPanel: nobody changes teams once the game is over, nor
+-- does a player of a losing team while the winners celebrate.
+function L.TeamMenuAllowed(state, currentTeam, winner)
+	if state == L.STATE_GAME_OVER then return false end
+	return not (state == L.STATE_TEAM_WIN and currentTeam >= RED and currentTeam ~= winner)
+end
+
+local TEAM_FULL = "Team is full"
+
+local function Choice(kind, spec, currentTeam)
+	return {
+		kind = kind,
+		index = spec.index,
+		label = spec.name,
+		color = spec.color,
+		count = spec.count,
+		command = spec.command,
+		enabled = true,
+		current = spec.index ~= nil and spec.index == currentTeam,
+	}
+end
+
+-- CTFTeamMenu::OnTick: a game team is disabled while it is the heavy team
+-- or joining it would unbalance the teams.
+local function TeamChoice(spec, counts, currentTeam, limit)
+	local c = Choice("team", spec, currentTeam)
+	local heavy = L.Unbalanced(counts, limit)
+	if heavy == spec.index or L.WouldUnbalance(counts, spec.index, currentTeam, limit) then
+		c.enabled, c.reason = false, TEAM_FULL
+	end
+	return c
+end
+
+-- The menu as data, for any game's teams. teams: the joinable teams in
+-- screen order, each { index, name, color, count, command }. extras.auto
+-- { name, command } and extras.spectate { index, name, command, count } are
+-- offered when present. Hotkeys number auto, spectate, then the teams
+-- (Teammenu.res: &1 random, &2 spectate, &3 BLU, &4 RED). Cancel only once
+-- the player has a team (CTFTeamMenu::Update).
+function L.TeamMenu(teams, currentTeam, limit, extras)
+	local counts = {}
+	for _, t in ipairs(teams) do counts[t.index] = t.count end
+	local menu = { teams = {}, choices = {}, cancel = currentTeam ~= UNASSIGNED }
+	local function Add(c)
+		menu.choices[#menu.choices + 1] = c
+		c.hotkey = #menu.choices
+		return c
+	end
+	if extras.auto then menu.auto = Add(Choice("auto", extras.auto, currentTeam)) end
+	if extras.spectate then menu.spectate = Add(Choice("spectate", extras.spectate, currentTeam)) end
+	for i, t in ipairs(teams) do menu.teams[i] = Add(TeamChoice(t, counts, currentTeam, limit)) end
+	return menu
 end
 
 return L
