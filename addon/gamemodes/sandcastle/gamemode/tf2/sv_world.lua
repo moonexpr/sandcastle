@@ -159,25 +159,6 @@ function TF2.HealFraction(ply, fraction)
 	return true
 end
 
--- info_player_teamspawn is an engine entity in GMod that ignores Enable,
--- Disable and SetTeam, so those inputs update the recorded keyvalues instead.
-hook.Add("AcceptInput", "tf2.teamspawn", function(ent, input, activator, caller, value)
-	if ent:GetClass() ~= "info_player_teamspawn" then return end
-	local kv = TF2.KV[ent]
-	if not kv then return end
-	input = string.lower(input)
-	if input == "enable" then
-		kv.startdisabled = "0"
-		return true
-	elseif input == "disable" then
-		kv.startdisabled = "1"
-		return true
-	elseif input == "setteam" then
-		kv.teamnum = tostring(value)
-		return true
-	end
-end)
-
 -- path_track handles its own Enable/DisablePath; the train watcher only needs
 -- to know which nodes are disabled, so note it and let the input through.
 hook.Add("AcceptInput", "tf2.pathtrack", function(ent, input)
@@ -193,37 +174,3 @@ hook.Add("AcceptInput", "tf2.pathtrack", function(ent, input)
 		kv.tf2disabled = not kv.tf2disabled or nil
 	end
 end)
-
--- Enabled spawn points of a team. Points marked MatchSummary stand in the
--- end-of-match podium room and are only used for that screen in TF2.
-function TF2.SpawnPoints(team)
-	local points = {}
-	for _, ent in ipairs(ents.FindByClass("info_player_teamspawn")) do
-		local kv = TF2.KeyValues(ent)
-		if kv.startdisabled ~= "1" and kv.matchsummary ~= "1" and tonumber(kv.teamnum) == team then
-			points[#points + 1] = ent
-		end
-	end
-	return points
-end
-
-local function Occupied(spot)
-	local pos = spot:GetPos()
-	for _, ent in ipairs(ents.FindInBox(pos + Vector(-16, -16, 0), pos + Vector(16, 16, 72))) do
-		if ent:IsPlayer() and ent:Alive() then return true end
-	end
-	return false
-end
-
--- A free enabled spawn point of the team, starting from a random one; an
--- occupied point only when every point is taken; nil when the team has none.
-function TF2.PickSpawn(team)
-	local points = TF2.SpawnPoints(team)
-	if #points == 0 then return nil end
-	local start = math.random(#points)
-	for i = 0, #points - 1 do
-		local spot = points[(start + i - 1) % #points + 1]
-		if not Occupied(spot) then return spot end
-	end
-	return points[start]
-end
