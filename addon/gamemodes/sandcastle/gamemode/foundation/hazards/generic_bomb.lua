@@ -14,6 +14,7 @@ module(...)
 DAMAGE_ATTACKER_AND_ATTACKER_ENEMIES, DAMAGE_EVERYONE = 0, 1
 
 INPUT_DETONATE = "detonate"
+INPUTS = { [INPUT_DETONATE] = true }
 OUTPUT_DETONATE = "OnDetonate"
 EXPLODE_ATTACHMENT = "alt-origin" -- where the blast, particle and gibs start
 
@@ -79,9 +80,9 @@ function OnDamaged(state, damage)
 	return Explosion(state, damage.team)
 end
 
+-- Detonate
 function OnInput(state, name, value)
-	if name == INPUT_DETONATE then return Explosion(state, state.team) end
-	return Hazards.Nothing
+	return Explosion(state, state.team)
 end
 
 function OnTouch(state, toucher)

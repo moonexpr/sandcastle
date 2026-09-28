@@ -400,6 +400,17 @@ T.test("Enable with nobody inside starts nothing", function()
 	T.eq(zapper:Tick(1).kind, NONE, "nobody")
 end)
 
+T.test("a hazard accepts only its own inputs, leaving Kill and AddOutput to the engine", function()
+	T.eq(HacksawBomb():Accepts(GenericBomb.INPUT_DETONATE), true, "Detonate")
+	T.eq(HacksawBomb():Accepts("kill"), false, "Kill")
+	local zapper = NewZapper(Zapper.ZAP_ON_TEST)
+	T.eq(zapper:Accepts(Zapper.INPUT_ENABLE), true, "Enable")
+	T.eq(zapper:Accepts(Zapper.INPUT_DISABLE), true, "Disable")
+	T.eq(zapper:Accepts(Zapper.INPUT_ZAP_TOUCHING), true, "ZapTouching")
+	T.eq(zapper:Accepts("addoutput"), false, "AddOutput")
+	T.eq(MapPumpkin():Accepts("kill"), false, "a pumpkin has no inputs")
+end)
+
 -- Gifts
 
 T.test("gift spawn locations belong to Halloween", function()

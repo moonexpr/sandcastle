@@ -63,9 +63,9 @@ function OnTouch(state, toucher)
 	return Hazards.Nothing
 end
 
--- Enable and Disable only start and stop the ZapThink; CTFHellZap's
--- m_bEnabled is never read.
-local INPUTS = {
+-- The inputs, by name. Enable and Disable only start and stop the
+-- ZapThink; CTFHellZap's m_bEnabled is never read.
+INPUTS = {
 	[INPUT_ENABLE] = function(state)
 		if #state.targets > 0 and state.type == ZAP_ON_TOUCH then state.zapAt = ZAP_NOW end
 		return Hazards.Nothing
@@ -78,9 +78,7 @@ local INPUTS = {
 }
 
 function OnInput(state, name, value)
-	local handler = INPUTS[name]
-	if handler == nil then return Hazards.Nothing end
-	return handler(state)
+	return INPUTS[name](state)
 end
 
 -- ZapThink: zap, then again in 0.25 s while anyone is inside.

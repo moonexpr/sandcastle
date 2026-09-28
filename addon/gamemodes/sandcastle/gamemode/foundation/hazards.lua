@@ -20,11 +20,12 @@
 --     as activator when activatorIsAttacker, otherwise with the hazard;
 --   FIZZLE { particles }: gone without a blast;
 --   ZAP { targets, particle }: a beam to each target, nothing more.
--- Plus :Team(), :Body() and :CreditsOwner() for the binding.
+-- Plus :Team(), :Body(), :Accepts(name) and :CreditsOwner() for the binding.
 --
 -- A variant is a part (foundation.hazards.<name>) providing
 -- NewState(config, now) and Team(state), and any of Body(state) -> { model,
 -- skin, scale, move } (absent: a point entity), OnDamaged(state, damage),
+-- INPUTS (a table keyed by the input names it takes) with
 -- OnInput(state, name, value), OnTouch(state, toucher) and
 -- Tick(state, now); an absent handler returns NONE. CREDITS_OWNER true makes
 -- the binding credit an attacker's owner (the archer, not the arrow).
@@ -90,9 +91,20 @@ local function Handle(self, handler, ...)
 end
 
 function Hazard:Damaged(damage) return Handle(self, self.variant.OnDamaged, damage) end
-function Hazard:Input(name, value) return Handle(self, self.variant.OnInput, name, value) end
 function Hazard:Touch(toucher) return Handle(self, self.variant.OnTouch, toucher) end
 function Hazard:Tick(now) return Handle(self, self.variant.Tick, now) end
+
+-- Whether the variant takes the input; the engine handles the rest (Kill,
+-- AddOutput).
+function Hazard:Accepts(name)
+	local inputs = self.variant.INPUTS
+	return inputs ~= nil and inputs[name] ~= nil
+end
+
+function Hazard:Input(name, value)
+	if not self:Accepts(name) then return Nothing end
+	return Handle(self, self.variant.OnInput, name, value)
+end
 
 -- CBaseEntity::OnTakeDamage: health is an integer, so what is left after a
 -- hit truncates toward zero; at 0 or below the entity is killed.
