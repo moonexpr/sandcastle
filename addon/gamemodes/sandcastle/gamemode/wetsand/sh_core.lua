@@ -4,15 +4,20 @@ WETSAND = WETSAND or {}
 
 -- Lua 5.1's require for the gamemode's module(...) files (gamemode/foundation/):
 -- GMod's include passes no name to the chunk, so load it here, once, calling
--- it with the dotted name. GM exists only while the gamemode loads.
+-- it with the dotted name. Above its module(...) call the chunk sees this
+-- require (GMod's own looks only in includes/modules/), to load its siblings.
+-- GM exists only while the gamemode loads.
 local GAMEMODE_ROOT = GM.FolderName .. "/gamemode/"
+local CHUNK_ENV = setmetatable({}, { __index = _G })
 
 function WETSAND.require(name)
 	if package.loaded[name] == nil then
-		CompileFile(GAMEMODE_ROOT .. name:gsub("%.", "/") .. ".lua")(name)
+		local chunk = CompileFile(GAMEMODE_ROOT .. name:gsub("%.", "/") .. ".lua")
+		setfenv(chunk, CHUNK_ENV)(name)
 	end
 	return package.loaded[name]
 end
+CHUNK_ENV.require = WETSAND.require
 
 WETSAND.TEAM_UNASSIGNED = 0
 WETSAND.TEAM_SPECTATOR = 1

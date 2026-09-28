@@ -19,7 +19,8 @@ addon/gamemodes/sandcastle/
   gamemode/wetsand/sv_*.lua      loaded on the server, name order
   gamemode/wetsand/cl_*.lua      loaded on clients, name order
   gamemode/foundation/<x>.lua    pure logic as a plain module(...) (no package.seeall, so no GMod
-                                 globals; standard-library globals captured as locals above the call),
+                                 globals; standard-library globals and sibling modules, via
+                                 require("foundation.<y>"), captured as locals above the call),
                                  module name foundation.<x>; NOT auto-loaded: the module that uses it
                                  loads it with WETSAND.require("foundation.<x>") (sh_core.lua)
   entities/entities/<class>.lua  one file per TF2 entity class

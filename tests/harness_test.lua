@@ -33,6 +33,13 @@ T.test("require loads a module once", function()
 	T.eq(second.Greet("you"), "hi, you", "not reloaded")
 end)
 
+T.test("a module requires a sibling through the same loader", function()
+	package.loaded["fixtures.greeting"] = nil
+	local Farewell = requireFixture("fixtures.farewell")
+	T.eq(Farewell.Greeter(), package.loaded["fixtures.greeting"], "sibling module")
+	T.eq(Farewell.require, nil, "require stays outside the module")
+end)
+
 T.test("gamemode root is the gamemode folder", function()
 	T.eq(T.ROOT, "addon/gamemodes/sandcastle/gamemode/", "root")
 end)
