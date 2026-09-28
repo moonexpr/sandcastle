@@ -13,7 +13,7 @@ local overtimeNag = CreateConVar("tf_overtime_nag", "0", FCVAR_NOTIFY, "Announce
 -- local player (tf2.sound is received by cl_announcer.lua).
 function WETSAND.SoundTo(players, name)
 	if #players == 0 then return end
-	net.Start("tf2.sound")
+	net.Start("wetsand_pa_sound_file")
 	net.WriteString(name)
 	net.Send(players)
 end
@@ -157,9 +157,9 @@ function WETSAND.SwapTeamScores()
 end
 
 -- A round notice for the HUD (teamplay_capture_blocked and the like).
-util.AddNetworkString("tf2.round.notice")
+util.AddNetworkString("wetsand_round_notice_show")
 function WETSAND.RoundNotice(text, team)
-	net.Start("tf2.round.notice")
+	net.Start("wetsand_round_notice_show")
 	net.WriteString(text)
 	net.WriteUInt(team, 2)
 	net.Broadcast()

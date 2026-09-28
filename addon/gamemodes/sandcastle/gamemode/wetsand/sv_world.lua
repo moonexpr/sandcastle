@@ -1,8 +1,8 @@
 -- Server-side world helpers shared by the TF2 entities.
 
-util.AddNetworkString("tf2.announce")
-util.AddNetworkString("tf2.ready")
-util.AddNetworkString("tf2.sound")
+util.AddNetworkString("wetsand_pa_announce_text")
+util.AddNetworkString("wetsand_client_loaded")
+util.AddNetworkString("wetsand_pa_sound_file")
 
 -- CTeamplayRoundBasedRules::BroadcastSound: a game sound every player of a
 -- team hears as their own (announcer lines, win/lose music). Team 0 is everyone.
@@ -12,7 +12,7 @@ function WETSAND.BroadcastSound(team, name)
 		if team == WETSAND.TEAM_UNASSIGNED or WETSAND.TeamOf(ply) == team then recipients[#recipients + 1] = ply end
 	end
 	if #recipients == 0 then return end
-	net.Start("tf2.sound")
+	net.Start("wetsand_pa_sound_file")
 	net.WriteString(name)
 	net.Send(recipients)
 end
@@ -26,7 +26,7 @@ function WETSAND.PlaySoundTo(ply, ent, name)
 end
 
 -- Sent by the client once it has finished loading (InitPostEntity).
-net.Receive("tf2.ready", function(_, ply)
+net.Receive("wetsand_client_loaded", function(_, ply)
 	ply.tf2Ready = true
 end)
 
@@ -104,7 +104,7 @@ function WETSAND.FireOutput(caller, name, activator)
 end
 
 function WETSAND.Announce(text, team)
-	net.Start("tf2.announce")
+	net.Start("wetsand_pa_announce_text")
 	net.WriteString(text)
 	net.WriteUInt(team or WETSAND.TEAM_UNASSIGNED, 2)
 	net.Broadcast()

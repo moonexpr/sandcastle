@@ -27,7 +27,7 @@ CHUNK_ENV.require = WETSAND.require
 -- loaded so far, in load order. Both directions use one net message: from a
 -- client it means "ready", from the server a list of features to load.
 local Features = WETSAND.require("foundation.features")
-local FEATURE_NET = "wetsand.feature"
+local FEATURE_NET = "wetsand_feature_load"
 local FEATURE_COUNT_BITS = 16
 
 local FeatureFiles = {}
@@ -104,7 +104,7 @@ else
 	end)
 
 	-- Net messages reach the client from InitPostEntity on.
-	hook.Add("InitPostEntity", "wetsand.feature", function()
+	hook.Add("InitPostEntity", "wetsand_feature_load", function()
 		net.Start(FEATURE_NET)
 		net.SendToServer()
 	end)

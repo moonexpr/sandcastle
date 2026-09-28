@@ -324,14 +324,14 @@ function WETSAND.OpenTeamMenu()
 	menu:MakePopup()
 end
 
-net.Receive("tf2.team.menu", function()
+net.Receive("wetsand_team_menu_open", function()
 	WETSAND.OpenTeamMenu()
 end)
 
 -- The server opens the menu for a player without a team once the client can
 -- receive it.
 hook.Add("InitPostEntity", "tf2.teams", function()
-	net.Start("tf2.team.ready")
+	net.Start("wetsand_team_menu_request")
 	net.SendToServer()
 end)
 

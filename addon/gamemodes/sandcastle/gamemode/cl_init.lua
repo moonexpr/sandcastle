@@ -5,7 +5,7 @@ for _, f in ipairs(GM:TF2Modules("cl_")) do include("wetsand/" .. f) end
 -- freeze is not spent on the loading screen.
 function GM:InitPostEntity()
 	self.BaseClass.InitPostEntity(self)
-	net.Start("tf2.ready")
+	net.Start("wetsand_client_loaded")
 	net.SendToServer()
 end
 

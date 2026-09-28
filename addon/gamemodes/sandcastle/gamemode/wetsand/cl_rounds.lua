@@ -105,7 +105,7 @@ end
 
 local notices = {}
 
-net.Receive("tf2.round.notice", function()
+net.Receive("wetsand_round_notice_show", function()
 	notices[#notices + 1] = { text = net.ReadString(), team = net.ReadUInt(2), expires = CurTime() + NOTICE_SECONDS }
 end)
 

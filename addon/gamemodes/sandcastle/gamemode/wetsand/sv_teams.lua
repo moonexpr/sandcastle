@@ -5,8 +5,8 @@
 -- are in foundation/teams.lua.
 local L = WETSAND.TeamRules
 
-util.AddNetworkString("tf2.team.menu")
-util.AddNetworkString("tf2.team.ready")
+util.AddNetworkString("wetsand_team_menu_open")
+util.AddNetworkString("wetsand_team_menu_request")
 
 -- TF2's convar, as teamplayroundbased_gamerules.cpp defines it;
 -- mp_teams_unbalance_limit is shared (sh_core.lua) for the team menu.
@@ -72,7 +72,7 @@ end
 
 -- CTFPlayer::InitialSpawn (TF_STATE_WELCOME): a new player has no team.
 -- GM:PlayerSpawn keeps them observing, and the team menu opens once their
--- client is ready for it ("tf2.team.ready").
+-- client is ready for it ("wetsand_team_menu_request").
 function WETSAND.SetInitialTeam(ply)
 	ply.tf2Team = UNASSIGNED
 	ply:SetTeam(UNASSIGNED)
@@ -103,13 +103,13 @@ function WETSAND.ShowTeamMenu(ply)
 		ply:PrintMessage(HUD_PRINTCENTER, "You can't change team at this time.")
 		return
 	end
-	net.Start("tf2.team.menu")
+	net.Start("wetsand_team_menu_open")
 	net.Send(ply)
 end
 
 -- Net messages sent during PlayerInitialSpawn can arrive before the client
 -- can take them, so the client says when it is ready for the menu.
-net.Receive("tf2.team.ready", function(_, ply)
+net.Receive("wetsand_team_menu_request", function(_, ply)
 	if WETSAND.Active() and ply.tf2Team == UNASSIGNED then WETSAND.ShowTeamMenu(ply) end
 end)
 

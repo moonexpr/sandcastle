@@ -29,7 +29,7 @@ local function Play(name)
 	if IsValid(ply) then ply:EmitSound(name) end
 end
 
-net.Receive("tf2.sound", function()
+net.Receive("wetsand_pa_sound_file", function()
 	Play(net.ReadString())
 end)
 

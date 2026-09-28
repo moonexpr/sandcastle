@@ -15,7 +15,7 @@ local timer_y = CreateClientConVar("wetsand_hud_timer_y", "0.08", true, false, "
 local announcement
 
 
-net.Receive("tf2.announce", function()
+net.Receive("wetsand_pa_announce_text", function()
 	announcement = {
 		text = net.ReadString(),
 		team = net.ReadUInt(2),
