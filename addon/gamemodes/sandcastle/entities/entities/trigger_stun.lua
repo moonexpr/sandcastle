@@ -4,7 +4,7 @@
 -- The stun is TF2.StunPlayer's: stun_type 0 slows by move_speed_reduction,
 -- 1 also takes controls, 2 is the loser state (no attacking).
 ENT.Type = "brush"
-ENT.Base = "tf2_trigger_volume"
+ENT.Base = "wetsand_trigger_volume"
 
 local STUN_INTERVAL = 0.5
 

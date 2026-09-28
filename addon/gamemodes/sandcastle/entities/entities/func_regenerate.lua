@@ -4,7 +4,7 @@
 -- (CTFPlayer::Regenerate), hears Regenerate.Touch alone, and the locker prop
 -- opens, then closes a second before the next use.
 ENT.Type = "brush"
-ENT.Base = "tf2_brush_volume"
+ENT.Base = "wetsand_brush_volume"
 
 local NEXT_USE_TIME = 3.0
 local SOUND = "Regenerate.Touch"

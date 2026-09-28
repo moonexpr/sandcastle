@@ -1,7 +1,7 @@
 AddCSLuaFile()
 
 ENT.Type = "anim"
-ENT.Base = "tf2_pickup_base"
+ENT.Base = "wetsand_pickup_base"
 ENT.Kind = "ammo"
 ENT.Size = "full"
 ENT.Model = "models/items/ammopack_large.mdl"

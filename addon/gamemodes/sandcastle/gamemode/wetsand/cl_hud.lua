@@ -8,7 +8,7 @@ surface.CreateFont("TF2Ents.Announce", { font = "Roboto", size = 42, weight = 90
 
 -- The top-centre of the screen can sit under a display notch (MacBook), so
 -- the timer is pushed down by a fraction of the screen height.
-local timer_y = CreateClientConVar("castle_hud_timer_y", "0.08", true, false, "Timer box top, as a fraction of screen height (clears display notches).")
+local timer_y = CreateClientConVar("wetsand_hud_timer_y", "0.08", true, false, "Timer box top, as a fraction of screen height (clears display notches).")
 
 local announcement
 

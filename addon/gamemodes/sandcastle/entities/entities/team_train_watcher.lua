@@ -58,7 +58,7 @@ function ENT:Initialize()
 	self.activated = false
 	self.subscribed = {}
 	-- path_track OnPass reaches the watcher by name, so a nameless one gets one
-	if self:GetName() == "" then self:SetName("tf2_train_watcher_" .. self:EntIndex()) end
+	if self:GetName() == "" then self:SetName("wetsand_train_watcher_" .. self:EntIndex()) end
 	hook.Add("TF2RoundActive", self, self.RoundActivate)
 	hook.Add("TF2Overtime", self, self.OnOvertime)
 end

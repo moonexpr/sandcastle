@@ -1,7 +1,7 @@
 -- func_respawnroom (CFuncRespawnRoom): a team's spawn room. Its team and
 -- active state drive the func_respawnroomvisualizer forcefields that name it.
 ENT.Type = "brush"
-ENT.Base = "tf2_brush_volume"
+ENT.Base = "wetsand_brush_volume"
 
 function ENT:VolumeInit()
 	self.originalTeam = self.team

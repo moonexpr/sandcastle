@@ -1,9 +1,9 @@
 -- Minimal harness for Sandcastle's pure-logic libraries, run under plain
--- LuaJIT (no GMod). Libraries under test live in gamemode/tf2/lib_*.lua and
+-- LuaJIT (no GMod). Libraries under test live in gamemode/wetsand/lib_*.lua and
 -- use no GMod globals, so a test loads them with dofile.
 local T = { passed = 0, failed = 0 }
 
-T.ROOT = "addon/gamemodes/sandcastle/gamemode/tf2/"
+T.ROOT = "addon/gamemodes/sandcastle/gamemode/wetsand/"
 
 function T.lib(name)
 	return dofile(T.ROOT .. "lib_" .. name .. ".lua")

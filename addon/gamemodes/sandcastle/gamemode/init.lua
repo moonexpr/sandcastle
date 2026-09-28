@@ -3,9 +3,9 @@ AddCSLuaFile("cl_init.lua")
 
 include("shared.lua")
 
-for _, f in ipairs(GM:TF2Modules("sh_")) do AddCSLuaFile("tf2/" .. f) end
-for _, f in ipairs(GM:TF2Modules("cl_")) do AddCSLuaFile("tf2/" .. f) end
-for _, f in ipairs(GM:TF2Modules("sv_")) do include("tf2/" .. f) end
+for _, f in ipairs(GM:TF2Modules("sh_")) do AddCSLuaFile("wetsand/" .. f) end
+for _, f in ipairs(GM:TF2Modules("cl_")) do AddCSLuaFile("wetsand/" .. f) end
+for _, f in ipairs(GM:TF2Modules("sv_")) do include("wetsand/" .. f) end
 
 -- New players are auto-assigned (GetAutoTeam) before their first spawn.
 function GM:PlayerInitialSpawn(ply, transition)

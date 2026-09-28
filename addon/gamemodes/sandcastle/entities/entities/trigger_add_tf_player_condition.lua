@@ -3,7 +3,7 @@
 -- lasts until they leave. See sv_teams_conditions.lua for which conditions
 -- have an effect in GMod.
 ENT.Type = "brush"
-ENT.Base = "tf2_trigger_volume"
+ENT.Base = "wetsand_trigger_volume"
 
 local PERMANENT = -1
 
