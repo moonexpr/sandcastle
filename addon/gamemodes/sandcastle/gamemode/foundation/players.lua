@@ -32,10 +32,14 @@ function RegenerateHealth(health, maxHealth)
 	return math.max(health, maxHealth)
 end
 
--- ETFCond values (tf_shareddefs.h) of the conditions payload maps apply.
+-- ETFCond values (tf_shareddefs.h) of the conditions payload maps apply,
+-- and those the Halloween NPCs read or give.
 COND = {
 	INVALID = -1,
+	DISGUISED = 3,
+	STEALTHED = 4,
 	INVULNERABLE = 5,
+	STEALTHED_BLINK = 9,
 	CRITBOOSTED = 11,
 	PHASE = 14,
 	BURNING = 22,
@@ -45,8 +49,16 @@ COND = {
 	SPEED_BOOST = 32,
 	CRITBOOSTED_USER_BUFF = 34,
 	CANNOT_SWITCH_FROM_MELEE = 41,
+	INVULNERABLE_HIDE_UNLESS_DAMAGED = 51,
+	INVULNERABLE_USER_BUFF = 52,
+	INVULNERABLE_CARD_EFFECT = 57,
+	STEALTHED_USER_BUFF = 64,
+	STEALTHED_USER_BUFF_FADING = 66,
 	BLAST_IMMUNE = 68,
+	HALLOWEEN_SPEED_BOOST = 72,
 	HALLOWEEN_QUICK_HEAL = 73,
+	HALLOWEEN_TINY = 75,
+	HALLOWEEN_GHOST_MODE = 77,
 	MELEE_ONLY = 85,
 	PURGATORY = 108,
 	GAS = 123,
@@ -88,7 +100,13 @@ function ClearOnRegenerate(conds)
 end
 
 -- TF_STUN_* (tf_shareddefs.h)
-STUN = { MOVEMENT = 1, CONTROLS = 2, NO_EFFECTS = 32, LOSER_STATE = 64 }
+STUN = {
+	MOVEMENT = 1,
+	CONTROLS = 2,
+	NO_EFFECTS = 32,
+	LOSER_STATE = 64,
+	BY_TRIGGER = 128,
+}
 
 -- trigger_stun's stun_type keyvalue.
 STUN_TYPE = { MOVEMENT = 0, CONTROLS = 1, LOSER_STATE = 2 }
