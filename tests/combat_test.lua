@@ -1,7 +1,11 @@
 local T = dofile("tests/harness.lua")
 local Fake = dofile("tests/fake_actor.lua")
+local FakeCombatant = dofile("tests/fake_combatant.lua")
 local Combat = T.require("foundation.combat")
 local Teams = T.require("foundation.teams")
+local Actor = T.require("foundation.npc.actor")
+local Combatant = T.require("foundation.npc.combatant")
+local Players = T.require("foundation.players")
 
 local V = Fake.Vector
 
@@ -179,6 +183,105 @@ T.test("a whole blast: a rocket among a crowd", function()
 			T.eq(amount, nil, v.name)
 		end
 	end
+end)
+
+-- The combatant port contract
+
+local ENTITIES = "addon/gamemodes/sandcastle/entities/entities/"
+
+local function ReadFile(path)
+	local f = assert(io.open(path, "r"))
+	local text = f:read("*a")
+	f:close()
+	return text
+end
+
+T.test("the fake combatant implements every actor and combatant method", function()
+	local me = FakeCombatant.Combatant({ world = FakeCombatant.World() })
+	for _, name in ipairs(Actor.METHODS) do
+		T.eq(type(me[name]), "function", "actor " .. name)
+	end
+	for _, name in ipairs(Combatant.METHODS) do
+		T.eq(type(me[name]), "function", "combatant " .. name)
+	end
+end)
+
+T.test("wetsand_combat_nextbot defines every combatant method", function()
+	local text = ReadFile(ENTITIES .. "wetsand_combat_nextbot.lua")
+	for _, name in ipairs(Combatant.METHODS) do
+		T.eq(text:find("function ENT:" .. name .. "(", 1, true) ~= nil, true, "wetsand_combat_nextbot " .. name)
+	end
+end)
+
+T.test("no combatant method shadows an actor or engine method", function()
+	local taken = {}
+	for _, name in ipairs(Actor.METHODS) do taken[name] = true end
+	for name in pairs(Actor.ENGINE) do taken[name] = true end
+	for _, name in ipairs(Combatant.METHODS) do
+		T.eq(taken[name], nil, "combatant " .. name)
+	end
+end)
+
+-- An entity file loads nothing at top level: every WETSAND.require and
+-- WETSAND.Feature call is inside a function, so indented or on a one-line
+-- function.
+local function LoadsAtTopLevel(line)
+	if line:match("^%s") or line:match("^function ") then return false end
+	return line:find("WETSAND.require", 1, true) ~= nil or line:find("WETSAND.Feature", 1, true) ~= nil
+end
+
+T.test("a top-level load is caught", function()
+	T.eq(LoadsAtTopLevel('local Combat = WETSAND.Feature("combat")'), true, "top level")
+	T.eq(LoadsAtTopLevel('\tself.combat = WETSAND.Feature("combat")'), false, "in a function")
+	T.eq(LoadsAtTopLevel('function ENT:Tag() return WETSAND.Feature("tag") end'), false, "one-line function")
+end)
+
+T.test("the combat and holiday bindings load nothing at top level", function()
+	for _, file in ipairs({ "wetsand_combat_nextbot.lua" }) do
+		for line in ReadFile(ENTITIES .. file):gmatch("[^\n]+") do
+			T.eq(LoadsAtTopLevel(line), false, file .. ": " .. line)
+		end
+	end
+end)
+
+-- The fake combatant: a world of players and NPCs the models can ask about.
+
+T.test("the fake collects living players by team, RED and BLU by default", function()
+	local world = FakeCombatant.World()
+	local red = world:AddPlayer({ team = Teams.RED })
+	local blue = world:AddPlayer({ team = Teams.BLUE })
+	world:AddPlayer({
+		team = Teams.BLUE,
+		alive = false,
+	})
+	world:AddPlayer({ team = Teams.SPECTATOR })
+	local me = FakeCombatant.Combatant({
+		world = world,
+		team = Teams.HALLOWEEN,
+	})
+	T.eq(me:GetTeamNumber(), Teams.HALLOWEEN, "my team")
+	T.eq(me:TeamOf(red), Teams.RED, "their team")
+	local blues = me:CollectPlayers(Teams.BLUE)
+	T.eq(#blues, 1, "one living blue")
+	T.eq(blues[1], blue, "the living one")
+	T.eq(#me:CollectPlayers(nil), 2, "red and blue")
+end)
+
+T.test("the fake reports conditions, invulnerability and effects", function()
+	local world = FakeCombatant.World()
+	local ubered = world:AddPlayer({
+		team = Teams.RED,
+		conds = { Players.COND.INVULNERABLE },
+	})
+	local me = FakeCombatant.Combatant({ world = world })
+	T.eq(me:InCond(ubered, Players.COND.INVULNERABLE), true, "in cond")
+	T.eq(me:IsInvulnerable(ubered), true, "invulnerable")
+	me:AddCond(ubered, Players.COND.URINE, 10)
+	T.eq(me:InCond(ubered, Players.COND.URINE), true, "cond added")
+	me:StunPlayer(ubered, 2, 0, Players.STUN.LOSER_STATE)
+	T.eq(#me:Called("StunPlayer"), 1, "stun recorded")
+	me:Explode({ damage = 10 })
+	T.eq(me:Called("Explode")[1][1].damage, 10, "explosion recorded")
 end)
 
 T.finish()
