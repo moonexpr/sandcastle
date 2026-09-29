@@ -992,4 +992,27 @@ T.test("the fake vortex port implements every vortex method", function()
 	end
 end)
 
+-- The bindings (read as text) define their ports as function ENT:<Name>(.
+local function Defines(file, name)
+	local f = assert(io.open("addon/gamemodes/sandcastle/entities/entities/" .. file, "r"))
+	local text = f:read("*a")
+	f:close()
+	return text:find("function ENT:" .. name .. "(", 1, true) ~= nil
+end
+
+T.test("the eyeball_boss binding defines the eyeball's port", function()
+	for _, name in ipairs(Eyeball.METHODS) do
+		T.eq(Defines("eyeball_boss.lua", name), true, "eyeball_boss " .. name)
+		T.eq(Actor.ENGINE[name], nil, "not an engine method: " .. name)
+	end
+end)
+
+-- The engine's Remove, EmitSound and WorldSpaceCenter already mean what the
+-- vortex port says, so the binding must not redefine them.
+T.test("the teleport_vortex binding defines the vortex port the engine does not", function()
+	for _, name in ipairs(Eyeball.VORTEX_METHODS) do
+		T.eq(Defines("teleport_vortex.lua", name), Actor.ENGINE[name] == nil, "teleport_vortex " .. name)
+	end
+end)
+
 T.finish()

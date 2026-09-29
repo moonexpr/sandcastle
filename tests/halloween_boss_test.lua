@@ -234,4 +234,54 @@ T.test("the template calls the variant's hooks in order, and dies into DyingActi
 	T.eq(s.npc:Describe(), "Dying", "dying replaces the behavior")
 end)
 
+-- The bindings (read as text): each defines its port's methods as
+-- function ENT:<Name>(, and loads nothing at file top level.
+local ENTITIES = "addon/gamemodes/sandcastle/entities/entities/"
+
+local function ReadFile(path)
+	local f = assert(io.open(path, "r"))
+	local text = f:read("*a")
+	f:close()
+	return text
+end
+
+local function Defines(file, name)
+	return ReadFile(ENTITIES .. file):find("function ENT:" .. name .. "(", 1, true) ~= nil
+end
+
+-- An entity file loads nothing at top level: every WETSAND.require and
+-- WETSAND.Feature call is inside a function.
+local function LoadsAtTopLevel(line)
+	if line:match("^%s") or line:match("^function ") then return false end
+	return line:find("WETSAND.require", 1, true) ~= nil or line:find("WETSAND.Feature", 1, true) ~= nil
+end
+
+T.test("halloween_base_boss defines the boss port, and no boss method shadows another port's", function()
+	local Actor = T.require("foundation.npc.actor")
+	local Combatant = T.require("foundation.npc.combatant")
+	local taken = {}
+	for _, name in ipairs(Actor.METHODS) do taken[name] = true end
+	for name in pairs(Actor.ENGINE) do taken[name] = true end
+	for _, name in ipairs(Combatant.METHODS) do taken[name] = true end
+	for _, name in ipairs(HalloweenBoss.METHODS) do
+		T.eq(Defines("halloween_base_boss.lua", name), true, "halloween_base_boss " .. name)
+		T.eq(taken[name], nil, "boss " .. name)
+	end
+end)
+
+T.test("the boss bindings load nothing at top level", function()
+	local files = {
+		"halloween_base_boss.lua",
+		"headless_hatman.lua",
+		"eyeball_boss.lua",
+		"teleport_vortex.lua",
+		"tf_projectile_rocket.lua",
+	}
+	for _, file in ipairs(files) do
+		for line in ReadFile(ENTITIES .. file):gmatch("[^\n]+") do
+			T.eq(LoadsAtTopLevel(line), false, file .. ": " .. line)
+		end
+	end
+end)
+
 T.finish()

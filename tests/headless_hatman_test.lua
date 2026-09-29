@@ -722,4 +722,15 @@ T.test("removed without dying (a map's Kill), it lets IT go", function()
 	T.eq(s.tag:Get(), nil, "nobody is IT")
 end)
 
+-- The binding (read as text) defines the port as function ENT:<Name>(.
+T.test("the headless_hatman binding defines the Horsemann's port", function()
+	local f = assert(io.open("addon/gamemodes/sandcastle/entities/entities/headless_hatman.lua", "r"))
+	local text = f:read("*a")
+	f:close()
+	for _, name in ipairs(HHH.METHODS) do
+		T.eq(text:find("function ENT:" .. name .. "(", 1, true) ~= nil, true, "headless_hatman " .. name)
+		T.eq(Actor.ENGINE[name], nil, "not an engine method: " .. name)
+	end
+end)
+
 T.finish()
