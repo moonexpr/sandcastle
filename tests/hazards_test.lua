@@ -453,4 +453,36 @@ T.test("scenario: a gift appears for each player, only its player can take it, a
 	T.eq(soldiers:Tick(now + 242), Gift.NONE, "once")
 end)
 
+-- The bindings
+
+local ENTITIES = "addon/gamemodes/sandcastle/entities/entities/"
+local BINDINGS = {
+	"tf_pumpkin_bomb.lua",
+	"tf_generic_bomb.lua",
+	"halloween_zapper.lua",
+	"tf_halloween_gift_spawn_location.lua",
+	"tf_halloween_gift_pickup.lua",
+}
+
+local function ReadFile(path)
+	local f = assert(io.open(path, "r"))
+	local text = f:read("*a")
+	f:close()
+	return text
+end
+
+-- A load inside a function is indented or on a one-line function.
+local function LoadsAtTopLevel(line)
+	if line:match("^%s") or line:match("^function ") then return false end
+	return line:find("WETSAND.require", 1, true) ~= nil or line:find("WETSAND.Feature", 1, true) ~= nil
+end
+
+T.test("the hazard and gift bindings load nothing at top level", function()
+	for _, file in ipairs(BINDINGS) do
+		for line in ReadFile(ENTITIES .. file):gmatch("[^\n]+") do
+			T.eq(LoadsAtTopLevel(line), false, file .. ": " .. line)
+		end
+	end
+end)
+
 T.finish()
